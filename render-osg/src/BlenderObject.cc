@@ -3,7 +3,7 @@
 #include "Traversal.hh"
 #include <stdexcept>
 
-static const matrix scheme_matrix(osg::Matrixd &m);
+//static const matrix scheme_matrix(osg::Matrixd &m);
 
 BlenderMaterial::BlenderMaterial(const char *filebase)
 {
@@ -77,8 +77,8 @@ BlenderMaterial::bind_uniforms(osgUtil::CullVisitor* cv)
 #endif       
 
     //const real * const mark = vs_mark(_scheme.vs);
-    scheme_set_ptr(_scheme, "<world=>camera>", scheme_matrix(view));
-    scheme_set_ptr(_scheme, "<camera=>world>", scheme_matrix(view_inv));
+    //UNCOMMENT: scheme_set_ptr(_scheme, "<world=>camera>", scheme_matrix(view));
+    //UNCOMMENT: scheme_set_ptr(_scheme, "<camera=>world>", scheme_matrix(view_inv));
     //scheme_set_ptr(_scheme, "lamp-0-<lamp=>world>", scheme_matrix(lamp_to_world));
     //scheme_set_ptr(_scheme, "lamp-0-<world=>lamp>", scheme_matrix(world_to_lamp)); 
     //scheme_eval(_scheme, "(bind-uniforms)");
@@ -152,7 +152,7 @@ BlenderObject::bind_attributes(void * const ctx, osg::Geode &geode, osg::Geometr
         
 
 
-
+/*
 static const matrix
 scheme_matrix(osg::Matrixd &m)
 {
@@ -162,3 +162,4 @@ scheme_matrix(osg::Matrixd &m)
                (real)m(0,2),(real)m(1,2),(real)m(2,2),(real)m(3,2),
                (real)m(0,3),(real)m(1,3),(real)m(2,3),(real)m(3,3)); 
 }
+*/

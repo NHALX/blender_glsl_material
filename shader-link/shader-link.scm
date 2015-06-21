@@ -1,5 +1,5 @@
 ;;apply varlet (curlet) linear-algebra)
-
+(define (m44-col-v3 m i) (v3-v4 (m44-col m i)))
 ;;Current implementation of orientation-matrix system in Blender is not reliable: there are limitations / some nasty problems with mirrored/non-uniform-scaled geometry in Blender
 ;; see http://wiki.blender.org/index.php/User:Migius/orientation_matrix
 
@@ -40,12 +40,12 @@
   ;(m44* (m44-invert lamp-to-world) cam-to-world)
 
 (define (lamp-dynco lamp-to-world world-to-cam)
-  (define location (m44-col lamp-to-world 3))
+  (define location (m44-col-v3 lamp-to-world 3))
   ;(v4-print (m44*-v3 world-to-cam location))
   (m44*-v3 world-to-cam location))
 
 (define (lamp-dynvec lamp-to-world world-to-cam)
-  (define rot (v3-negate (v3-normalize (m44-col lamp-to-world 2))))
+  (define rot (v3-negate (v3-normalize (m44-col-v3 lamp-to-world 2))))
 ;   (v4-print rot)
 ;;  (m44-print world-to-cam)
                                         ; (v4-print (m44-col lamp-to-world 2))
@@ -92,11 +92,10 @@
                                   0.0 0.0 0.0 1.0))
 
 (define (lamp-perspective-matrix spot-size clip-start clip-end world-to-lamp cam-to-world)
-  
   (m44* perspective-to-depth
-        (lamp-to-perspective spot-size clip-start clip-end)
-        world-to-lamp
-        cam-to-world))
+        (m44* (lamp-to-perspective spot-size clip-start clip-end)
+              (m44* world-to-lamp
+                    cam-to-world))))
 
 
 ;(define (uniform-generic type name val) (display (list type name val "\n")))

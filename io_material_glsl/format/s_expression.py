@@ -41,7 +41,7 @@ def vector(v):
     if len(v) == 4:
         return "(v4 %r %r %r %r)" % tuple(v)
     elif len(v) == 3:
-        return "(v4-from3 %r %r %r)" % tuple(v)
+        return "(v3 %r %r %r)" % tuple(v)
     else:
         raise "vector: bad length"
     

@@ -30,6 +30,9 @@ MIST_TYPE_QUADRATIC         = 0
 MIST_TYPE_LINEAR            = 1
 MIST_TYPE_INVERSE_QUADRATIC = 2
 
+def v4_v3(v):
+    return (v[0], v[1], v[2], 1.0)
+
 def vnegate(v):
     u = v.copy()
     u.negate()

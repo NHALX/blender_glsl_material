@@ -2,13 +2,13 @@
  
  (u-e-function "uniform-3fv" "Assign vector to the uniform variable - trunctate to 3D."
                (u-arg r u-string "name")
-               (u-arg r u-vector "value")
+               (u-arg r u-v3 "value")
 			   (u-arg-ref r r u-void "shader-obj")			   
                (u-arg w u-int ""))
  
  (u-e-function "uniform-4fv" "Assign vector to the uniform variable."
                (u-arg r u-string "name")
-               (u-arg r u-vector "value")
+               (u-arg r u-v4 "value")
 			   (u-arg-ref r r u-void "shader-obj")			   
                (u-arg w u-int ""))
  
@@ -26,7 +26,7 @@
  
  (u-e-function "uniform-Matrix4fv" "Assign a matrix to the uniform variable."
                (u-arg r u-string "name")
-               (u-arg r u-matrix "value")
+               (u-arg r u-m44 "value")
 			   (u-arg-ref r r u-void "shader-obj")
                (u-arg w u-int ""))
     

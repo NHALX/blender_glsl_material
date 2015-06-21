@@ -52,8 +52,8 @@ $(SRCDIR)/%.hh.gch : precompile/%.hh
 
 depends: $(SRCDIR)/OpenSceneGraph.hh.gch
 
-bind: $(OBJS) ../generated/scheme-s7.c  $(BIND_OBJS)
-	g++ ../generated/scheme-s7.c $(CFLAGS) $(LDFLAGS) $(OBJS) $(BIND_OBJS) -o $@
+bind: $(OBJS) $(BIND_OBJS)
+	g++ ../binding/gen-s7-ffi.c $(CFLAGS) $(LDFLAGS) $(OBJS) $(BIND_OBJS) -o $@
 
 clean:
 	find ../obj/render-osg/ -iname \*.o | xargs rm

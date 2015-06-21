@@ -210,10 +210,10 @@ scheme _scheme;
 
 int main( int argc, char **argv )
 {
-    _scheme = scheme_init(NULL);
+    _scheme = scheme_init(NULL,NULL);
     scheme_eval(_scheme, "(apply varlet (curlet) linear-algebra)");
     scheme_eval(_scheme, "(apply varlet (curlet) uniform)");
-    scheme_load(_scheme, "test3.rkt"); // TODO: error check
+    scheme_load(_scheme, "../shader-link/shader-link.scm"); // TODO: error check
     
     Core *core = new Core;
     core->db_init();

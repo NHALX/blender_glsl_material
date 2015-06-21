@@ -2,15 +2,13 @@
 (require "gen-common.rkt")
 (require "gen-base-C.rkt")
 
+;; TODO: delete float real?
 (define C-pre "
 #ifdef __cplusplus
 extern \"C\" {
 #endif
 
 typedef float real;
-typedef real (*matrix)[4][4]; 
-typedef real (*vector)[4];
-
 struct vector_stack;
 ")
 
@@ -23,11 +21,12 @@ struct vector_stack;
 
 (define C-types
   '(begin
-     (define u-bool         "bool")
-     (define u-matrix       "matrix")
-     (define u-vector       "vector")
-     (define u-string       "char *")
-     (define u-vector-stack "struct vector_stack") ))
+     (define u-bool    "bool")
+     (define u-m44     "m44_t")
+     (define u-v4      "v4_t")
+     (define u-v3      "v3_t")
+     (define u-string  "char *")
+     (define u-v-stack "struct vector_stack") ))
 
 
 (define C-language-decl
@@ -47,12 +46,7 @@ struct vector_stack;
                (u-symbol name)
                (string-join args ", ")))
      
-     (define (u-e-variadic-function name description ret)
-       (function-decl name (list "void *ctx"
-                                 "const void **argv"
-                                 "const unsigned int argc"
-                                 ret)))
-
+     
      (define (u-e-function name description . xs)
        (function-decl name (cons "void *ctx" xs)))
 
@@ -92,6 +86,3 @@ struct vector_stack;
 
     false)
 
-#;(begin
-       (display "error: no input files\n")
-       (exit 1))

@@ -71,10 +71,12 @@ unf_to_expr = {
     
     # WORLD
     gpu.GPU_DYNAMIC_HORIZON_COLOR  : lambda w:
-        Val("world-horizon-color", w.horizon_color),
+        Expr(shade.v4_v3,
+             Val("world-horizon-color", w.horizon_color)),
     
     gpu.GPU_DYNAMIC_AMBIENT_COLOR  : lambda w:
-        Val("world-ambient-color", w.ambient_color),
+        Expr(shade.v4_v3,
+             Val("world-ambient-color", w.ambient_color)),
 
     
     # MIST

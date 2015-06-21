@@ -7,7 +7,7 @@
     (file-name-from-path file) "")))
 
 
-(define (binding-export lib-prefix es import-files)
+(define (binding-export lib-prefix es import-files [post-process values])
   (parameterize ([current-namespace (make-base-namespace)])
     (namespace-require 'racket/string)
     (namespace-require 'racket/list)
@@ -24,8 +24,11 @@
         (eval `(set! export-environment ,(file->environment-name file)))
         (for-each eval es)
         (load file)))
+
+    (define results
+      (map exec import-files))
     
-    (map exec import-files) ))
+    (eval `(,post-process ',results)) ))
 
 
 

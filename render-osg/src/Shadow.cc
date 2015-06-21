@@ -1,5 +1,6 @@
 #include "OpenSceneGraph.hh"
 #include "Shadow.hh"
+#include "Matrix.hh"
 #include <stdexcept>
 
 extern scheme _scheme;
@@ -79,7 +80,8 @@ SpotLamp::syncTransform()
     double spotsize = get_d(id, "spot-size");
     double znear    = get_d(id, "shadow-buffer-clip-start");
     double zfar     = get_d(id, "shadow-buffer-clip-end");
-    matrix pos      = (matrix) get_p(id, "<world=>lamp>");
+    m44_t pos       = (m44_t) get_p(id, "<world=>lamp>"); // TODO: get_p
+                                                        // needs to gc tag
     
     shadow->setViewMatrix(osg::Matrix(MATRIX_FIELDS_TRANSPOSED(pos)));
                                    

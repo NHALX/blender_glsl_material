@@ -1,6 +1,6 @@
 #include "OpenSceneGraph.hh"
-
 #include "BlenderObject.hh"
+#include "Matrix.hh"
 /*
 #include "BlenderLamp.hh"
 #include "GlobalState.hh"
@@ -63,28 +63,36 @@ extern "C"
 	ATTRIBUTE_SF(4fv)
 	ATTRIBUTE_SF(4ubv)
 
-#define UNIFORM_SF(XXX,T,T2,VAL)										\
+#define BARRIER_TYPECHECK(UT,N)                                         \
+    do {                                                                \
+        if (!v){                                                        \
+            printf("uniform-%s: %s: warning typecheck failed.\n", UT, N); \
+            return -1;                                                  \
+        }                                                               \
+    } while (0)
+        
+    
+#define BARRIER_NONE(UT,N) \
+    do {} while (0)
+    
+#define UNIFORM_SF(XXX,T,T2,VAL,BARRIER)                                \
 	int uniform_##XXX(void *env, const char *n, T v, const void *obj)	\
 	{																	\
+        BARRIER(#XXX,n);                                                \
+                                                                        \
 		((osg::StateSet*)obj)->getOrCreateUniform(						\
 			std::string(n),												\
 			osg::Uniform::T2)->set(VAL);								\
 		trace("uniform-%s: %s = %p\n", #XXX, n, v);						\
+        return 0;                                                       \
 	}																	
 
-	UNIFORM_SF(1i,int,INT,v)
-	UNIFORM_SF(1fv,real,FLOAT,v)	
-	UNIFORM_SF(3fv,vector,FLOAT_VEC3,osg::Vec3((*v)[0],
-											   (*v)[1],
-											   (*v)[2]))
-
-	UNIFORM_SF(4fv,vector,FLOAT_VEC4,osg::Vec4((*v)[0],
-											   (*v)[1],
-											   (*v)[2],
-											   (*v)[3]))
-			   
-	UNIFORM_SF(Matrix4fv,matrix,FLOAT_MAT4,
-			   osg::Matrix(MATRIX_FIELDS_TRANSPOSED(v)))
+	UNIFORM_SF(1i,int,INT,v,)
+	UNIFORM_SF(1fv,real,FLOAT,v,)
+	UNIFORM_SF(3fv,v3_t,FLOAT_VEC3,*v, BARRIER_TYPECHECK)
+	UNIFORM_SF(4fv,v4_t,FLOAT_VEC4,*v, BARRIER_TYPECHECK)
+	UNIFORM_SF(Matrix4fv,m44_t,FLOAT_MAT4, *v, BARRIER_TYPECHECK)
+			   //osg::Matrix(MATRIX_FIELDS_TRANSPOSED(v)))
 
 
 	int sampler(
