@@ -1,1 +1,0 @@
-extern osg::Group*blenderRenderState();

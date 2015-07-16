@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+RACKET=racket -l errortrace -t
 OBJDIR = ../obj/render-osg
 SRCDIR = ./src
 
@@ -26,8 +28,13 @@ BIND_OBJS =	$(OBJDIR)/BindUniform.o \
 			$(OBJDIR)/BlenderRenderState.o \
 			$(OBJDIR)/RenderTexture.o 
 
-$(OBJDIR)/%.o : $(SRCDIR)/%.cc
-	g++ -c $(CFLAGS) $< -o $@
+#generated/%.cc : $(SRCDIR)/%.cc.rkt
+#	$(RACKET) $< > $@
+
+$(OBJDIR)/%.o : $(SRCDIR)/%.cc.rkt
+	(set -o pipefail && $(RACKET) $< \
+		| (g++ -xc++ -c $(CFLAGS) -o $@ - || ($(RACKET) $< && exit 1)))
+
 
 
 all : bind
@@ -53,7 +60,17 @@ $(SRCDIR)/%.hh.gch : precompile/%.hh
 depends: $(SRCDIR)/OpenSceneGraph.hh.gch
 
 bind: $(OBJS) $(BIND_OBJS)
-	g++ ../binding/gen-s7-ffi.c $(CFLAGS) $(LDFLAGS) $(OBJS) $(BIND_OBJS) -o $@
+	g++ ../generated/s7-ffi-linear-algebra.c \
+	    ../generated/s7-ffi-uniform.c \
+	    ../generated/s7-scheme.c \
+			$(CFLAGS) $(LDFLAGS) $(OBJS) $(BIND_OBJS) -o $@
+
+##################################
+eval-script: $(OBJS) $(OBJDIR)/Matrix.o
+	g++ ../generated/s7-ffi-linear-algebra.c \
+	    ../generated/s7-scheme.c \
+        $(OBJDIR)/Matrix.o \
+			$(CFLAGS) $(LDFLAGS) $(OBJS) eval/eval.cc -o $@
 
 clean:
 	find ../obj/render-osg/ -iname \*.o | xargs rm

@@ -1,4 +1,4 @@
-
+RACKET=racket -l errortrace -t
 INCLUDES=-Iembed/s7/ -I.
 CFLAGS_UNUSED=-flto -fdata-sections -ffunction-sections -Wl,--gc-sections -fmerge-all-constants
 CFLAGS=-ggdb -g3 -g -O0 $(INCLUDES) 
@@ -12,19 +12,30 @@ all: generated benchmark eval bind
 generated: generated/shader-link.h \
 			generated/linear-algebra.h \
 			generated/uniform.h \
-			generated/scheme-s7.h \
-			generated/scheme-s7.c
+			generated/s7-ffi-linear-algebra.c \
+			generated/s7-ffi-uniform.c \
+            generated/s7-scheme.h \
+            generated/s7-scheme.c
 	ls -l $^
+	(cd generated && ln -sf s7-scheme.h scheme.h)
 
+#%/scheme-s7.h %/scheme-s7.c: binding/export/linear-algebra.scm \
+#							 binding/export/shader-link.scm \
+#							 binding/export/uniform.scm
+#
+#	racket -l errortrace -t binding/s7-ffi.c.rkt $^ > $*/scheme-s7.c
 
-%/scheme-s7.h %/scheme-s7.c: binding/export/linear-algebra.scm \
-							 binding/export/shader-link.scm \
-							 binding/export/uniform.scm
+generated/s7-scheme.h : binding/export/linear-algebra.scm binding/export/uniform.scm
+	$(RACKET) binding/s7-scheme.h.rkt $^ > $@
 
-	racket -l errortrace -t binding/gen-s7-ffi.rkt $^ $*/scheme-s7
+generated/s7-scheme.c : binding/export/linear-algebra.scm binding/export/uniform.scm
+	$(RACKET) binding/s7-scheme.c.rkt $^ > $@
+
+generated/s7-ffi-%.c : binding/export/%.scm binding/s7-ffi.rkt
+	$(RACKET) binding/s7-ffi.rkt $< > $@
 
 generated/%.h : binding/export/%.scm
-	racket -l errortrace -t binding/gen-C.rkt $< > $@
+	$(RACKET) binding/c-header.rkt $< > $@
 
 obj/%.o : %.c
 	gcc -c $(CFLAGS) $< -o $@
@@ -54,26 +65,6 @@ test/% : test/%.in
 shader: test/material.frag test/material.vert
 	ls -l $^
 
-
-BIND_OBJS =	bind.o \
-			OpenSceneGraph/ShaderTest.o \
-			OpenSceneGraph/BufferShadows.o \
-			OpenSceneGraph/BlenderObject.o \
-			OpenSceneGraph/Matrix.o \
-			OpenSceneGraph/BlenderRenderState.o
-
-OpenSceneGraph/%.hh.gch : OpenSceneGraph/precompile/%.hh
-	g++ -c $(CFLAGS) -DWITH_LINEAR_ALGEBRA -DWITH_SHADER_LINK -DWITH_UNIFORM -I../osg/include/ \
-		$< -o $@
-
-bind: $(OBJS) generated/scheme-s7.c OpenSceneGraph/OpenSceneGraph.hh.gch $(BIND_OBJS)
-
-	g++ -DWITH_LINEAR_ALGEBRA -DWITH_SHADER_LINK -DWITH_UNIFORM \
-		-I../osg/include/ $(CFLAGS) $^  \
-		-L../osg/lib -Lobj/ \
-		-Wl,-Bstatic -llinear-algebra \
-		-Wl,-Bdynamic -losg -losgViewer -losgManipulator -losgGA -losgDB -losg -losgShadow -losgUtil \
-		-o $@
 
 benchmark: $(OBJS) generated/scheme-s7.c benchmark.c
 	gcc -DWITH_LINEAR_ALGEBRA -DWITH_SHADER_LINK \
