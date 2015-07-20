@@ -84,6 +84,17 @@
                             (apply map f z)) x)) xs))
 
 
+
+
+;; https://en.wikipedia.org/wiki/Paramorphism
+
+(define/match (paramorphism f n _)
+  [(_ _ (list)) n]
+  [(_ _ (cons x xs)) 
+   (f x xs
+      (paramorphism f n xs))])
+
+
 ;; similar to the haskell version: unfoldr
 
 (define (unfold f seed [tail-gen (lambda (x) '())])

@@ -2,8 +2,8 @@
 #extension GL_ARB_texture_query_lod : enable
 #extension GL_EXT_gpu_shader4: enable
 #extension GL_ARB_draw_instanced: enable
-#define GPU_ATI
-#define CLIP_WORKAROUND
+//#define GPU_ATI
+//#define CLIP_WORKAROUND
 
 #define BUMP_BICUBIC 1
 

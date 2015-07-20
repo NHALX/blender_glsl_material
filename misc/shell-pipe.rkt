@@ -1,5 +1,6 @@
 #lang racket/base
-(require racket/function racket/port racket/match racket/string racket/set)
+(require racket/function racket/port racket/match
+         racket/string racket/set racket/list)
 (require "NHA.rkt")
 (provide exec)
 
@@ -9,21 +10,28 @@
            (close-input-port port))))
 
 
-(define (shell-pipe-spawn commands)
+
+(define (shell-pipe-spawn in out commands)
   
-  (define/match (f cmd st)
-    [(_ (cons xs stdout->stdin))
+  (define/match (f cmd rest st)
+    [(_ _ (cons xs stdout->stdin))
+     
+     (define output
+       (if (empty? rest)
+           out
+           #f))         
+           
      (define-values (pid stdout _ stderr)
        (apply subprocess (append
-                          (list #f stdout->stdin #f)
+                          (list output stdout->stdin #f)
                           (string-split cmd))))
-
+     
      (cons (cons
             (list pid (output-sink stderr) stdout)
             xs)
            stdout)])
 
-  (foldl f (cons '() #f) commands))
+  (paramorphism f (cons '() in) commands))
 
 
 (define (shell-pipe-wait results)
@@ -48,24 +56,59 @@
 (define (shell-pipe-cleanup results)
   
   (define (cleanup pid tid port)
-    (close-input-port port))
+    (when port
+      (close-input-port port)))
   
   (for-each (⤶ apply cleanup) results))
 
 
-(define (exec . commands)
-  (match-define (cons results output)
-    (shell-pipe-spawn commands))
+
+(define (exec #:in-fp [in #f]
+              #:out-fp [out #f]
+              #:exists [exists-flag 'error]
+              . commands)
+
+  (define (do-exec i o)
+    (match-define (cons results output)
+      (shell-pipe-spawn i o commands))
+    
+    (when output
+      (display (port->string output)))
+    
+    (define success
+      (andmap (⤶ = 0)
+              (shell-pipe-wait results)))
+    
+    (shell-pipe-cleanup results)
+    
+    (unless success
+      (error 'exec "external process signaled failure.")))
+
+
+  (parameterize ([current-custodian (make-custodian)])
+    
+    (define (maybe-open x open)
+      (cond [(path-string? x)  (open x)]
+            [(port? in)        x]
+            [else              #f]))
+    
+    (define in-port
+      (maybe-open in open-input-file))
+    
+    (define out-port
+      (maybe-open out (curry open-output-file #:exists exists-flag)))
+          
+    (do-exec in-port out-port)
+    
+    (custodian-shutdown-all (current-custodian))))
+
+
+(module* test racket/base
+  (require (submod ".."))
+  ;(exec "/bin/ls -l")
   
-  (display (port->string output))
+  (exec #:in-fp  "/home/nha/.profile"
+        #:out-fp "/home/nha/test.txt"
+        #:exists 'replace
+        "/usr/bin/wc -l"))
 
-  (define success
-    (andmap (⤶ = 0)
-            (shell-pipe-wait results)))
-  
-  (shell-pipe-cleanup results)
-  success)
-
-
-;(shell-compose "/bin/ls -l" "/usr/bin/wc -l" "/bin/ls")
-;(shell "/bin/ls -l")

@@ -38,7 +38,11 @@
 
 (define S string-append)
 
-(define (exec-simulate . xs)
+(define (exec-simulate 
+         #:in-fp [in #f]
+         #:out-fp [out #f]
+         #:exists [exists-flags 'error]
+         . xs)
   (begin
     (displayln (string-join xs " | "))
     #t))

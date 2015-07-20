@@ -1,24 +1,40 @@
 #lang racket/base
 (require (for-syntax racket/base))
-(require "math-symbol.rkt")
+;(require "math-symbol.rkt")
+(require "NHA.rkt")
+(require "c-pre-stdlib.rkt")
 (require scribble/text)
+(require racket/function)
 
-(provide (all-from-out "math-symbol.rkt")
-         (all-from-out racket/base)
-         (all-from-out scribble/text))
+(provide (all-from-out "NHA.rkt")
+         (all-from-out racket/base racket/function)
+         (all-from-out scribble/text)
+         (all-from-out "c-pre-stdlib.rkt"))
 
-(provide __FILE__ __LINE__ emit-#line C export import import* source)
+(provide __FILE__ __LINE__ emit-#line C export import import* source 
+         hash:__FILE__:__LINE__)
 
 
 (define-syntax (__FILE__ stx)
   (with-syntax ([file (syntax-source stx)])
     (syntax-case stx ()
-      [_ #'file])))
+      [_ #''file])))
 
 (define-syntax (__LINE__ stx)
   (with-syntax ([line (syntax-line stx)])
     (syntax-case stx ()
       [_ #'line])))
+
+(define-syntax (hash:__FILE__:__LINE__ stx)
+    (syntax-case stx ()
+      [(_ prefix) #`(let [[h (equal-hash-code  
+                              (format "~a:~a"
+                                      #,(syntax-source stx)
+                                      #,(syntax-line stx)))]]
+             (if (< h 0 )
+                 (string-append prefix "1" (number->string (abs h)))
+                 (string-append prefix "0" (number->string h))))]))
+
 
 (define-syntax (import stx)
   (syntax-case stx ()
@@ -30,6 +46,7 @@
        #`(require (prefix-in
                    name
                    #,(datum->syntax stx `(submod ,#'module ,#'c-header))))))))
+
 
 ;undecorated version
 (define-syntax (import* stx)

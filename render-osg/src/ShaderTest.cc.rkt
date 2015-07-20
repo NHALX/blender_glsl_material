@@ -1,5 +1,5 @@
 #lang at-exp s-exp "../../misc/c-pre.rkt"
-(require "../../bullshit.rkt")
+(require "language-ext.rkt")
 
 (export (void) @begin/text{
   //////////////////////////////////////////////////
@@ -11,6 +11,7 @@
 
 (source (begin
          (import "Matrix")
+         (import "BlenderMaterial")
          (import "BlenderObject")
          (import "BlenderRenderState")
          (import "BindUniform")
@@ -52,6 +53,37 @@
       }
   }
 
+osg::Geode* createAxis()
+{
+    osg::Geode*     geode    = new osg::Geode();
+    osg::Geometry*  geometry = new osg::Geometry();
+    osg::Vec3Array* vertices = new osg::Vec3Array();
+    osg::Vec4Array* colors   = new osg::Vec4Array();
+
+    vertices->push_back(osg::Vec3(0.0f, 0.0f, 0.0f));
+    vertices->push_back(osg::Vec3(10.0f, 0.0f, 0.0f));
+    vertices->push_back(osg::Vec3(0.0f, 0.0f, 0.0f));
+    vertices->push_back(osg::Vec3(0.0f, 10.0f, 0.0f));
+    vertices->push_back(osg::Vec3(0.0f, 0.0f, 0.0f));
+    vertices->push_back(osg::Vec3(0.0f, 0.0f, 10.0f));
+
+    colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    colors->push_back(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    colors->push_back(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    colors->push_back(osg::Vec4(0.0f, 0.0f, 1.0f, 1.0f));
+    colors->push_back(osg::Vec4(0.0f, 0.0f, 1.0f, 1.0f));
+
+    geometry->setVertexArray(vertices);
+    geometry->setColorArray(colors, osg::Array::BIND_PER_VERTEX);
+    geometry->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINES, 0, 6));
+    geometry->getOrCreateStateSet()->setMode(GL_LIGHTING, false);
+
+    geode->addDrawable(geometry);
+    geode->setName("Axis");
+    return geode;
+}
+
 
   class Core {
   public:
@@ -86,11 +118,48 @@
   }
 
 
+  class CameraManipulator : public osgGA::TrackballManipulator
+  {
+  public:
+      CameraManipulator()
+      {
+      }
+
+      osg::Matrixd getMatrix() const
+      {
+          osg::Matrixd result;
+          osg::Matrixd m = osg::Matrixd::translate( 0., 0., _distance ) *
+            osg::Matrixd::rotate( _rotation ) *
+            osg::Matrixd::translate( _center );
+          result.orthoNormalize(m);
+          return result;
+      }
+	
+      osg::Matrixd getInverseMatrix() const
+      {     
+          osg::Matrixd result;
+          osg::Matrixd m = osg::Matrixd::translate( -_center ) *
+            osg::Matrixd::rotate( _rotation.inverse() ) *
+            osg::Matrixd::translate( 0.0, 0.0, -_distance );
+
+          result.orthoNormalize(m);
+          return result;
+      }
+
+      void zoomModel(const float dy, bool pushForwardIfNeeded)
+      {
+          float scale = 1.0f + dy;
+          _distance *= scale;
+      }
+
+  protected:
+      ~CameraManipulator(){}
+  };
 
   void Core::manipulator_init()
   {
       //viewer.run();
-      manip = new osgGA::TrackballManipulator();
+      manip = new CameraManipulator();
 
       double fovy;
       double aspectRatio;
@@ -111,7 +180,7 @@
       viewer->setLightingMode( osg::View::NO_LIGHT );
 
       viewer->getCamera()->setComputeNearFarMode(
-                                     osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
+                                    osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
       viewer->getCamera()->setClearMask( GL_COLOR_BUFFER_BIT
                                         |GL_DEPTH_BUFFER_BIT);
@@ -138,63 +207,108 @@
   osg::Group *
   test_scene()
   {
-
-          /*
+    /*
       osg::ref_ptr<osg::Group> scene   = new osg::Group;
 
-      osg::ref_ptr<osg::Group> cessna1 = (osg::Group*) osgDB::readNodeFile("cessna.osg");
-      osg::ref_ptr<osg::Group> cessna2 = (osg::Group*) osgDB::readNodeFile("cessna.osg");
+      osg::ref_ptr<osg::Group> cessna1 = (osg::Group*) 
+                                              osgDB::readNodeFile("cessna.osg");
+      osg::ref_ptr<osg::Group> cessna2 = (osg::Group*) 
+                                              osgDB::readNodeFile("cessna.osg");
       osg::ref_ptr<osg::MatrixTransform> positioned = new osg::MatrixTransform;
 
-      cessna1->getChild(0)->setNodeMask(CastsShadowTraversalMask|ReceivesShadowTraversalMask);
-      cessna2->getChild(0)->setNodeMask(CastsShadowTraversalMask|ReceivesShadowTraversalMask);
+      cessna1->getChild(0)->setNodeMask(CastsShadowTraversalMask | 
+                                        ReceivesShadowTraversalMask);
+      cessna2->getChild(0)->setNodeMask(CastsShadowTraversalMask |
+                                        ReceivesShadowTraversalMask);
 
       positioned->setMatrix(osg::Matrix::translate(10,10,25));
       positioned->addChild(cessna1);
       scene->addChild(positioned);
       scene->addChild(cessna2); 
       return scene;
-      */
+    */
       return new osg::Group;
-
   }
 
-  /*
-  void whatever(osg::ref_ptr<ShadowGroup> sg,
-                osg::ref_ptr<BlenderMaterial> obj,
-                int index,
-                int shadowUnit)
+
+
+  void material_update_camera(osg::Camera *camera)
   {
-      obj->getStateSet()->setTextureAttributeAndModes(
-          shadowUnit,
-          sg->get(index)->getTexture(),
-          osg::StateAttribute::ON |
-          osg::StateAttribute::OVERRIDE);
+      osg::Matrix *view = new osg::Matrix;
+      osg::Matrix *view_inv = new osg::Matrix;
 
-      obj->getStateSet()->setTextureMode(shadowUnit,GL_TEXTURE_GEN_S,osg::StateAttribute::ON);
-      obj->getStateSet()->setTextureMode(shadowUnit,GL_TEXTURE_GEN_T,osg::StateAttribute::ON);
-      obj->getStateSet()->setTextureMode(shadowUnit,GL_TEXTURE_GEN_R,osg::StateAttribute::ON);
-      obj->getStateSet()->setTextureMode(shadowUnit,GL_TEXTURE_GEN_Q,osg::StateAttribute::ON);
-  }
-  */
+      view->orthoNormalize(sync_matrix(camera->getViewMatrix()));
+      view_inv->orthoNormalize(sync_matrix(camera->getInverseViewMatrix()));
+      // view_inv->invert(*view);  // Warning: dont double transpose on accident
 
-
-  osg::ref_ptr<osg::Group>
-  compose3(osg::ref_ptr<osg::Group> a,
-           osg::ref_ptr<osg::Group> b,
-           osg::ref_ptr<osg::Group> c)
-  {
-      a->addChild(b);
-      b->addChild(c);
-      return a;
+      ss_set_m44_t(_scheme, "<world=>camera>", view);
+      ss_set_m44_t(_scheme, "<camera=>world>", view_inv);
   }
 
-  osg::ref_ptr<osg::Group>
-  compose2(osg::ref_ptr<osg::Group> a,
-           osg::ref_ptr<osg::Group> b)
+
+
+  void set_animation(osg::ref_ptr<osg::Node> obj)
   {
-      a->addChild(b);
-      return a;
+      @c:define[(name-equal? str x result)]{
+          @|result| = @|x|->getName() == "@|str|";
+      }
+
+      @c:define[(find-animation-manager state x)]{
+
+          if (@|state|.valid())
+              return;
+
+          if (@|x|.getUpdateCallback()) 
+          {
+              osgAnimation::AnimationManagerBase* b = dynamic_cast
+                  <osgAnimation::AnimationManagerBase*>
+                  (@|x|.getUpdateCallback());
+          
+              if (b){
+                  @|state| = new osgAnimation::BasicAnimationManager(*b);
+                  return;
+              }
+          }
+      }
+
+      /////////////////
+
+      osg::ref_ptr<osgAnimation::BasicAnimationManager> manager = NULL;
+
+      @(node:fold "osg::ref_ptr<osgAnimation::BasicAnimationManager>" 
+        "manager" "obj" find-animation-manager)
+
+
+      if (manager.valid())
+      {
+          obj->setUpdateCallback(manager);
+
+          @(c:for-each "osgAnimation::AnimationList" 
+            "manager->getAnimationList()"
+            @c:λ[(x)]{
+                    std::cout << "animation: " 
+                              << @|x|->getName()
+                              << std::endl;
+                })
+
+          osg::ref_ptr<osgAnimation::Animation> animation;
+
+          @(c:find "osgAnimation::AnimationList" 
+            "animation"
+            (curry name-equal? "Action")
+            "manager->getAnimationList()")
+
+          if (animation)
+          {
+              manager->playAnimation(animation);
+          }
+
+      } else 
+      {
+          osg::notify(osg::WARN) << 
+              "no osgAnimation::AnimationManagerBase found in the subgraph,"
+              "no animations available" << std::endl;
+      }
   }
 
 
@@ -204,27 +318,53 @@
   //    printf("ref:%d\n",scene->referenceCount());
       //abort();
 
-      osg::ref_ptr<BlenderMaterial> material = new BlenderMaterial("test/material");
-      osg::ref_ptr<BlenderObject> BLEND_OBJ = new BlenderObject(material, osgDB::readNodeFile("mattest.fbx"));
+      osg::ref_ptr<BlenderMaterial> material = new 
+        BlenderMaterial("test/material");
 
+      
+      osg::ref_ptr<BlenderObject> BLEND_OBJ = new 
+        BlenderObject(material, osgDB::readNodeFile("mattest.fbx"));
 
+      set_animation(BLEND_OBJ);
+      
+        ///////////////////////
       osg::ref_ptr<osg::Group> blender = blenderRenderState();   
-      osg::ref_ptr<ShadowGroup> sg     = new ShadowGroup();
+      osg::ref_ptr<ShadowGroup> sg     = new ShadowGroup(material);
       PreloadEnv p_env = {sg};
 
       material->preload_samplers(&p_env);
-      /*
-      osg::ref_ptr<SpotLamp> lamp0 = sg->get("lamp-0");
-      osg::ref_ptr<SpotLamp> lamp1 = sg->get("lamp-1");
-      */
-
-
-      //  whatever(sg, material, 0x1234, 2);
-      //whatever(sg, material, 0x1235, 1);
-
       material->addChild(BLEND_OBJ);
-      sg->getScene()->addChild(material);
+
+      blender->addChild(material);
       blender->addChild(sg);
+      blender->addChild(createAxis());
+
+      @(node:for-each "blender"
+        @c:λ[(x)]{
+
+            osg::NodePathList paths = @|x|.getParentalNodePaths();
+            osg::NodePath path = paths[0];
+
+            @(c:for-each "osg::NodePath" "path"
+                @c:λ[(p)]{
+                  const std::string& name = @|p|->getName();
+                  osg::notify(osg::WARN) 
+                    << "/"
+                    << static_cast<void*>(@|p|)
+                    << ":"
+                    << (name.empty() ? "???" : name);
+                })
+            
+
+            osg::notify(osg::WARN) 
+              << std::endl;
+          })
+
+      osg::notify(osg::WARN) 
+        << "root: "
+        << static_cast<void*>(viewer)
+        << std::endl;
+
       viewer->setSceneData(blender);
       viewer->stopThreading();
 
@@ -233,20 +373,20 @@
 
       //viewer->setSceneData(scene); //compose3(sg,blender,scene));//compose3(sg, blender, scene));
 
-      viewer->realize();
+      viewer->realize(); 
 
       while( !viewer->done() )
       {    
           viewer->advance();
           viewer->eventTraversal();
           viewer->updateTraversal();
-
+          material_update_camera(viewer->getCamera());
           //extern void applyLampCamera(const char *id, osg::Camera *shadow);
           //applyLampCamera("lamp-0", viewer->getCamera());
           viewer->renderingTraversals();
       }
 
-  }
+  }  
 
 
   scheme _scheme;

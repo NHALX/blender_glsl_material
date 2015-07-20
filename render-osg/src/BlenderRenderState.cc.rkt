@@ -27,17 +27,18 @@
   blenderRenderState()
   {
       osg::Group *group = new osg::Group();
+      group->setName("BlenderRenderState");
       osg::StateSet *ss = group->getOrCreateStateSet();
       //ss->setAttribute(new osg::Depth(osg::Depth::Function(GL_LEQUAL), 0.0, 1.0));
       ss->setAttribute(new osg::ShadeModel(osg::ShadeModel::Mode(GL_FLAT)));
-      ss->setAttribute(new osg::FrontFace(osg::FrontFace::Mode(GL_CW)));
+      ss->setAttribute(new osg::FrontFace(osg::FrontFace::Mode(GL_CCW)));
       ss->setAttribute(new osg::CullFace(osg::CullFace::Mode(GL_BACK)));
     
       osg::LightModel *lm = new osg::LightModel();
       lm->setTwoSided(GL_FALSE);
       ss->setAttribute(lm);
 
-      //ss->setMode(GL_RESCALE_NORMAL, osg::StateAttribute::ON); // TODO: do i need this?
+      ss->setMode(GL_RESCALE_NORMAL, osg::StateAttribute::ON); // TODO: do i need this?
     
   #define Disable(mode)                                                   \
       ss->setMode(mode, osg::StateAttribute::OFF|osg::StateAttribute::OVERRIDE);

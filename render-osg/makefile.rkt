@@ -1,6 +1,5 @@
 #lang at-exp s-exp "../misc/make.rkt"
 
-
 (define racket "/usr/local/bin/racket")
 (define cc     "/usr/bin/gcc")
 (define c++    "/usr/bin/g++")
@@ -11,7 +10,7 @@
 (define ld-flags
   @S{-L../../osg/lib -L../obj/ -Wl,-Bdynamic -losg -losgViewer 
                      -losgManipulator -losgGA -losgDB -losg 
-                     -losgShadow -losgUtil})
+                     -losgShadow -losgUtil -losgAnimation})
 
 (define obj-dir "../obj/render-osg/")
 
@@ -29,7 +28,8 @@
 
 
 (define files:ccr⟹obj
-  (let [[xs (module-deps ext-ccr? main-module)]]
+  ;; TODO: ext-ccr? filter doesnt handle when changes are made to c-pre.
+  (let [[xs (module-deps ext-ccr? main-module)]] 
     (map cons xs (map (⤶ gen-obj-file obj-dir) xs))))
 
 (define files:glsl-in⟹glsl
@@ -51,17 +51,23 @@
 
 (define (ccr⟹obj in out)
   
-  (define gen-c
-    @S{@|racket| @|in|})
-  
-  (define commands
-    (list gen-c
-          @S{@|c++| -xc++ -c @|c-flags| -o @|out| -}))
-      
-  (unless (apply (subsys) commands)
-    (begin
-      ((subsys) gen-c)
-      (error 'ccr⟹obj "external process signaled failure.")))
+  (define gen-interm 
+    (∘ path->string
+       (⤶ build-path "generated")
+       file-name-from-path
+       (⤷ path-replace-suffix ".cc")))
+
+  (define src
+    (gen-interm in))
+
+  ((subsys)   
+   #:out-fp src
+   #:exists 'replace 
+   @S{@|racket| @|in|})
+
+  ((subsys)
+   #:in-fp src
+   @S{@|c++| @|src| -c @|c-flags| -o @|out|})
 
   (void)) 
 
@@ -83,9 +89,13 @@
   (link (map cdr files:ccr⟹obj) "bind"))
 
 
-(define (execute . xs)
-  (apply exec-simulate xs)
-  (apply exec xs))
+(define (execute  #:in-fp [in #f]
+                  #:out-fp [out #f]
+                  #:exists [exists-flag 'error]
+                 . xs)
+
+  (apply exec-simulate #:in-fp in #:out-fp out #:exists exists-flag xs)
+  (apply exec #:in-fp in #:out-fp out #:exists exists-flag xs))
 
 
 

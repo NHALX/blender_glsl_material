@@ -87,9 +87,9 @@
       typedef std::string ID;
 
       std::map<ID, SpotLamp*>  _lamps;
-      osg::ref_ptr<osg::Group> _scene;
+      osg::ref_ptr<osg::Node> _scene;
 
-      osg::ref_ptr<osg::Group> getScene()
+      osg::ref_ptr<osg::Node> getScene()
       {
           return _scene;
       }
@@ -101,7 +101,7 @@
       }
 
       //META_Node(osg, ShadowGroup); // TODO: is this needed?
-      ShadowGroup();
+      ShadowGroup(osg::ref_ptr<osg::Node>);
       virtual void traverse(osg::NodeVisitor &nv);
 
       SpotLamp* reserveLamp(const char *id, size_t width);
@@ -131,10 +131,10 @@
   extern scheme _scheme;
 
 
-  ShadowGroup::ShadowGroup()
+  ShadowGroup::ShadowGroup(osg::ref_ptr<osg::Node> scene)
   {
-      _scene = new osg::Group;
-      //addChild(scene);
+      setName("ShadowNode");
+      _scene = scene;
   }
 
   SpotLamp*
@@ -225,19 +225,11 @@
   void
   ShadowGroup::traverse(osg::NodeVisitor &nv)
   {
-      for (std::map<ID,SpotLamp*>::iterator x = _lamps.begin(); 
-           x != _lamps.end();
-           ++x)
-      {
-          //if ((*x).second->_dirty)
-          //{
-          //    (*x).second->_dirty = false;            
-              (*x).second->syncTransform();
-          //}
-
-          (*x).second->shadow->accept(nv);
-      }
-      _scene->accept(nv);
+      @(c:for-each "std::map<ID,SpotLamp*>" "_lamps"
+         @c:λ[x]{
+            @|x|.second->syncTransform();
+            @|x|.second->shadow->accept(nv);
+         })
   }
 
 

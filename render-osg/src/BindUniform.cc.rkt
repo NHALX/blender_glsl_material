@@ -31,7 +31,8 @@
         if (strcmp(attribute_name, "@|symbol|") == 0){
             // TODO: will this overwrite each other?
             target->program->addBindAttribLocation(name, i);
-            target->geometry->setVertexAttribArray(i,target->geometry->@|source|);
+            target->geometry->setVertexAttribArray(i,
+                                                   target->geometry->@|source|);
             target->geometry->setVertexAttribNormalize(i, false);
             return 0;
         }
@@ -51,7 +52,7 @@
         bind_target *target = (bind_target*) user_data;
         int i = base_channel + channel;
 
-        @(map (← apply attach) xs)
+        @(map (⤶ apply attach) xs)
 
         // g->setVertexAttribBinding(i, osg::Geometry::BIND_PER_VERTEX);
         return -1;
@@ -72,7 +73,8 @@
           @(if check-ptr @C{
 
               if (!v){
-                  printf("uniform-@|suffix|: %s: warning typecheck failed.\n", n);
+                  printf("uniform-@|suffix|: %s: "
+                         "warning typecheck failed.\n", n);
                   return -1;
               }
 
@@ -95,7 +97,7 @@
   {
       static int base_channel = 6; // 1 6 7    - TODO: deal with this better
 
-      @(map (← apply attribute)
+      @(map (⤶ apply attribute)
         `((2fv  ((vertex-texture-coordinates   "getTexCoordArray(0)")))
           (3fv  ((vertex-color                 "getColorArray()")
                  (vertex-original-coordinates  "getVertexArray()")
@@ -104,7 +106,7 @@
           (4fv  ())
           (4ubv ())))
 
-      @(map (← apply uniform)
+      @(map (⤶ apply uniform)
         `((1i         integer INT         "(int) v"            #f)
           (1fv        real    FLOAT       "v"                  #f)
           (3fv        v3_t    FLOAT_VEC3  "*v"                 #t)
@@ -126,11 +128,11 @@
               (osg::Texture2D*)tex,
               osg::StateAttribute::ON);
 
-          @(map (← format 
+          @(map (⤶ format 
             "((osg::StateSet*)ss)->setTextureMode(channel, 
-                                              ~a,
-                                              osg::StateAttribute::ON |
-                                              osg::StateAttribute::OVERRIDE);\n")
+                                             ~a,
+                                             osg::StateAttribute::ON |
+                                             osg::StateAttribute::OVERRIDE);\n")
             `(GL_TEXTURE_GEN_S
               GL_TEXTURE_GEN_T
               GL_TEXTURE_GEN_R
