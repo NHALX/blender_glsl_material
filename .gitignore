@@ -37,8 +37,11 @@
 callgrind.out*
 *.pyc
 *.\#*
+*\~
 trash/
 temp/
 obj/
 embed/s7/s7/
 generated/
+compiled/
+

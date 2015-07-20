@@ -1,7 +1,9 @@
-#include "generated/scheme-s7.h"
+//#include "generated/scheme-s7.h"
+/*
 #include "generated/linear-algebra.h"
 #include "generated/shader-link.h"
 #include "generated/uniform.h"
+*/
 // TODO: trim these
 #include <osg/Node>
 #include <osg/Group>
@@ -50,4 +52,6 @@
 #include <osg/ShapeDrawable>
 #include <osg/NodeVisitor>
 #include <osg/Node>
-
+#include <osgAnimation/AnimationManagerBase>
+#include <osgAnimation/Bone>
+#include <osgAnimation/BasicAnimationManager>
