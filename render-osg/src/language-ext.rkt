@@ -8,16 +8,17 @@
 @;; generates boilerplate for OSGs visitor pattern
 
 @c:define[(node:fold 
-           #:class-name [name (uid-counter "__node_fold_struct_")]
-           type result obj f)]{
+           result-var obj f ;; TODO: handle state-type right
+           #:class-name [name (uid-counter "__node_fold_struct_")] 
+           #:state-type [stype (c:type-info-type result-var)])]{
 
  //// node:fold ////
  {
      struct @|name|: public osg::NodeVisitor
      {
-         @|type| @|name|_state;
+         @stype @|name|_state;
 
-         @|name|(@|type| initial) :
+         @|name|(@stype initial) :
              osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN),
              @|name|_state(initial)
          {}
@@ -28,10 +29,10 @@
              traverse(@|name|_node);
          }
 
-     } @|name|_callback(@|result|);
+     } @|name|_callback(@|(c:type-info-symbol result-var)|);
 
      @|obj|->accept(@|name|_callback);
-     @|result| = @|name|_callback.@|name|_state;
+     @|(c:type-info-symbol result-var)| = @|name|_callback.@|name|_state;
  }}
 
 

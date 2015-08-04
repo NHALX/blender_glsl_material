@@ -5,7 +5,6 @@
           racket/dict
           racket/path
           racket/format
-          "../misc/math-symbol.rkt"
           "../misc/c-pre.rkt"
           "c-core.rkt"
           "s7-core.rkt")
@@ -99,10 +98,10 @@ generated get/set ops for each type
 s7 wrap imported C functions
 */
 
-@(map (λx @C{
-             #include "generated/@|x|.h"
+@(map (λ (x) @C{
+                #include "generated/@|x|.h"
 
-          })
+                })
   import-modules)
 
 
@@ -156,8 +155,8 @@ s7 wrap imported C functions
             (split-at-right arguments 1)]]
    
           (values
-            (map (→ dict-ref `name) xs)
-            (map (→ dict-ref `read) xs)
+            (map (⤷ dict-ref `name) xs)
+            (map (⤷ dict-ref `read) xs)
             (car x))))
       
        (define (call xs)

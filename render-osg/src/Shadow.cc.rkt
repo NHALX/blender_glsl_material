@@ -1,7 +1,9 @@
 #lang at-exp s-exp "../../misc/c-pre.rkt"
 
 (export
- (begin (import "RenderTexture"))
+ (begin 
+  (import "RenderTexture"))
+
  @begin/text{
   //////////////////////////////////////////////////
   // ╻ ╻
@@ -38,28 +40,14 @@
   public:
       const char *id;
 
-      //degrees fov;
-      //double znear;
-      //double zfar;
-      //radians spotsize;
-
-      //osg::ref_ptr<osg::MatrixTransform> transform;
-
-
       void syncTransform();
 
       osg::Texture2D* getShadowBuffer()
       {
           return shadow->getTexture();
       }
-      /*
-      void dirty()
-      {
-          _dirty = true;
-      }*/
-  protected:
-      //bool _dirty;
 
+  protected:
 
       SpotLamp(const char *name, size_t width, osg::Node *scene)
       {
@@ -86,7 +74,7 @@
       //typedef unsigned long long ID;
       typedef std::string ID;
 
-      std::map<ID, SpotLamp*>  _lamps;
+      std::map<ID, SpotLamp*> _lamps;
       osg::ref_ptr<osg::Node> _scene;
 
       osg::ref_ptr<osg::Node> getScene()
@@ -102,6 +90,7 @@
 
       //META_Node(osg, ShadowGroup); // TODO: is this needed?
       ShadowGroup(osg::ref_ptr<osg::Node>);
+
       virtual void traverse(osg::NodeVisitor &nv);
 
       SpotLamp* reserveLamp(const char *id, size_t width);
@@ -131,11 +120,55 @@
   extern scheme _scheme;
 
 
+  @(define (get type result name)
+    @C{
+    @|type| @|result|;
+    {
+        char fmt_buf[1024];
+        snprintf(fmt_buf, sizeof fmt_buf - 1, "%s-%s", id, "@|name|");
+
+        if (ss_get_@|type|(_scheme, fmt_buf, &@|result|) != 0)
+            std::runtime_error(@C{"error: @|name| not found."});
+    }
+    })
+
+  void
+  SpotLamp::syncTransform()
+  {
+      ss_env env = ss_env_enter(_scheme, "global");
+      @(get "real" "spotsize" "spot-size")
+      @(get "real" "znear" "shadow-buffer-clip-start")
+      @(get "real" "zfar" "shadow-buffer-clip-end")
+      @(get "m44_t" "pos_" "<world=>lamp>")
+      ss_env_exit(_scheme, env);
+
+      // TODO: mark pointer with gc during copy
+      osg::Matrix pos = osg::Matrix(*pos_); 
+
+      shadow->setViewMatrix(sync_matrix(pos));     
+
+      if (spotsize < M_PI) // 180 degrees
+      {
+          double w = znear * tan(spotsize / 2);
+          shadow->setProjectionMatrixAsFrustum(-w,w,-w,w,
+                                               znear,
+                                               zfar);
+      } 
+      else 
+          shadow->setProjectionMatrixAsOrtho(-40, 40, -40, 40,
+                                             znear,
+                                             zfar); // TODO: what are the
+                                                    // bounds? 40 isnt
+                                                    // right
+  }
+
+
   ShadowGroup::ShadowGroup(osg::ref_ptr<osg::Node> scene)
   {
       setName("ShadowNode");
       _scene = scene;
   }
+
 
   SpotLamp*
   ShadowGroup::reserveLamp(const char *name, size_t width)
@@ -163,73 +196,16 @@
   }
 
 
-  @(define (= type result name)
-    @C{
-    @|type| @|result|;
-    {
-        char fmt_buf[1024];
-        snprintf(fmt_buf, sizeof fmt_buf - 1, "%s-%s", id, "@|name|");
-        if (ss_get_@|type|(_scheme, fmt_buf, &@|result|) != 0)
-            std::runtime_error(@C{"error: @|name| not found."});
-    }
-    })
-
-
-
-  void
-  applyLampCamera(const char *id, osg::Camera *shadow)
-  {   
-      @(= "real" "spotsize" "spot-size")
-      @(= "real" "znear" "shadow-buffer-clip-start")
-      @(= "real" "zfar" "shadow-buffer-clip-end")
-      @(= "m44_t" "pos_" "<world=>lamp>")
-
-      // TODO: mark pointer with gc during copy
-      osg::Matrix pos = osg::Matrix(*pos_); 
-      /*
-      printf("shadow(%s): \n"
-             "            %f %f %f %f\n"
-             "            %f %f %f %f\n"
-             "            %f %f %f %f\n"
-             "            %f %f %f %f\n", id, MATRIX_FIELDS((&pos))); 
-      printf("spotsize=%f,znear=%f,zfar=%f\n", spotsize, znear, zfar);
-  */
-
-      shadow->setViewMatrix(sync_matrix(pos));     
-
-      if (spotsize < M_PI) // 180 degrees
-      {
-          double w = znear * tan(spotsize / 2);
-          shadow->setProjectionMatrixAsFrustum(-w,w,-w,w,
-                                               znear,
-                                               zfar);
-      } 
-      else 
-          shadow->setProjectionMatrixAsOrtho(-40, 40, -40, 40,
-                                             znear,
-                                             zfar); // TODO: what are the
-                                                    // bounds? 40 isnt
-                                                    // right
-  }
-
-
-
-  void
-  SpotLamp::syncTransform()
-  {
-      applyLampCamera(id, shadow);
-  }
-
-
-
   void
   ShadowGroup::traverse(osg::NodeVisitor &nv)
   {
-      @(c:for-each "std::map<ID,SpotLamp*>" "_lamps"
-         @c:λ[x]{
-            @|x|.second->syncTransform();
-            @|x|.second->shadow->accept(nv);
-         })
+      @Λ[(process-lamp lamp)]{
+          @|lamp|.second->syncTransform();
+          @|lamp|.second->shadow->accept(nv);
+      }
+
+      @(c:for-each process-lamp
+         (c:type-info "_lamps" "std::map<ID,SpotLamp*>"))
   }
 
 

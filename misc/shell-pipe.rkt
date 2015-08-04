@@ -4,9 +4,10 @@
 (require "NHA.rkt")
 (provide exec)
 
-(define (output-sink port)
+(define (output-sink-error port)
   (thread (thunk
-           (display (port->string port))
+           (display (port->string port)
+                    (current-error-port))
            (close-input-port port))))
 
 
@@ -27,7 +28,7 @@
                           (string-split cmd))))
      
      (cons (cons
-            (list pid (output-sink stderr) stdout)
+            (list pid (output-sink-error stderr) stdout)
             xs)
            stdout)])
 
@@ -51,6 +52,10 @@
            (cons error '()))))])
   
   (unfold f (map car results)))
+
+
+(define (shell-pipe-wait-threads results)
+  (for-each (∘ thread-wait cadr) results))
 
 
 (define (shell-pipe-cleanup results)
@@ -78,7 +83,8 @@
     (define success
       (andmap (⤶ = 0)
               (shell-pipe-wait results)))
-    
+
+    (shell-pipe-wait-threads results) ; prevents race condition when aborting
     (shell-pipe-cleanup results)
     
     (unless success

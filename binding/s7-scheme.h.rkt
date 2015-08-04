@@ -5,7 +5,6 @@
           racket/dict
           racket/path
           racket/format
-          "../misc/math-symbol.rkt"
           "../misc/c-pre.rkt"
           "s7-core.rkt"
           "c-core.rkt")
@@ -28,8 +27,8 @@ extern "C" {
 @(define (map-c-types pred f)
   (define g
    (∘ c-type
-      (← filter pred)
-      (→ dict-ref `types)))
+      (⤶ filter pred)
+      (⤷ dict-ref `types)))
   
   (map f (remove-duplicates
           (apply append
@@ -42,7 +41,7 @@ extern "C" {
       (extern-type? x)))
   
 @(map-c-types extern-or-new?
-    (← format "typedef void * ~a;\n"))  
+    (⤶ format "typedef void * ~a;\n"))  
 #endif
 
 #define SSHOW_BUF_SIZE 1024
@@ -71,6 +70,7 @@ typedef struct {
     };
 } ss_result;
 
+const ss_result result_not_found = { SS_NOT_FOUND, 0 };
   
 extern ss_result ss_get(scheme s, const char *name);
 extern int ss_set_ptr(scheme s, const char *name, void *v);
@@ -93,14 +93,16 @@ extern const void* s7_object_value_s(s7_scheme *sc, int type_id, s7_pointer p);
     
  })
 
-@(map (← apply read-safe) safe-conversion-table)
+@(map (⤶ apply read-safe) safe-conversion-table)
  
 
 /*
 ╻ ╻┏━┓┏━┓   ┏━╸┏━╸╺┳╸ ╻┏━┓┏━╸╺┳╸
 ┃┏┛┣━┫┣┳┛╺━╸┃╺┓┣╸  ┃ ┏┛┗━┓┣╸  ┃ 
 ┗┛ ╹ ╹╹┗╸   ┗━┛┗━╸ ╹ ╹ ┗━┛┗━╸ ╹ 
-*/  
+all *set functions take ownership of the pointer passed to them,
+registering it for garbage collection.
+*/
 @(map-c-types
   (λ (x) (not (equal? x `(primitive-type void))))
   extern-get/set)
@@ -119,9 +121,14 @@ extern scheme ss_init();
 ┗━┓┗━┓╺━╸┣╸ ┃┏┛┣━┫┃  
 ┗━┛┗━┛   ┗━╸┗┛ ╹ ╹┗━╸
 */
-  
-extern ss_result ss_load(scheme s, const char *file);
-extern ss_result ss_eval(scheme s, const char *buffer);
+typedef s7_pointer ss_env;
+extern ss_result ss_env_new(scheme s, const char *name);
+extern ss_env    ss_env_enter(scheme s, const char *name);
+extern void      ss_env_exit(scheme s, ss_env old);
+extern ss_result ss_load(scheme s, const char *file, const char *maybe_env); 
+extern ss_result ss_eval(scheme s, const char *buffer, const char *maybe_env);
+extern char*     ss_seval(scheme s, const char *code, const char *env); 
+                          // caller must free string result
   
 /*
 ┏━┓┏━┓   ╻┏┳┓┏━┓┏━┓┏━┓╺┳╸
@@ -129,7 +136,7 @@ extern ss_result ss_eval(scheme s, const char *buffer);
 ┗━┛┗━┛   ╹╹ ╹╹  ┗━┛╹┗╸ ╹
 */
 
-@(map (λx
+@(map (λ (x)
        @C{
       
          #include "generated/@|x|.h"

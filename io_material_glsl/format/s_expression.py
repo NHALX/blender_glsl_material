@@ -1,3 +1,19 @@
+import itertools
+
+def fst(x): 
+    return x[0]
+
+def snd(x): 
+    return x[1]
+
+def partition(items, predicate=bool):
+    a, b = itertools.tee((predicate(item), item) for item in items)
+    return ((item for pred, item in a if not pred),
+            (item for pred, item in b if pred))
+
+def flatten(xs): 
+    return [item for sublist in xs for item in sublist]
+
 # converts from internal format to S-EXPR format
 if __name__ == '__main__':
     class Matrix: pass
@@ -61,28 +77,79 @@ value = match(
 def attribute(t,v,channel,attr_name):
     return "(attribute-%s \"%s\" %d \"%s\" usr)" % (t,v,channel,attr_name.replace("_","-"))
 
-def group_defines(xs):
-    xs.sort()
-    return '\n'.join(xs) + "\n"
+
+
+def group_defines(is_global, get_group, xs):
+
+    xs.sort(key = fst)
+
+    local, glbl  = partition(xs, lambda x: is_global(fst(x)))
+    local_lines  = '\n'.join(map(snd,local)) + "\n\n"
+    global_lines = '\n    '.join(map(snd,glbl))
+
+    return (("(with-namespace global\n (begin\n    %s))\n\n" % global_lines) +
+            local_lines)
+
             
-def group_uniforms(xs):
-    xs.sort()
-    return "(define (bind-uniforms usr) \n  (begin\n    %s))\n\n" % '\n    '.join(xs)
+def group_uniforms(all_groups, xs):
+
+    xs.sort(key = fst)
+    groups      = []
+    missing     = set(all_groups)
+
+    for g, xs in itertools.groupby(xs, fst):
+        missing -= set([g])
+        groups  += [(g, list(xs))]
+
+    print(missing)
+    print(groups)
+    for g in missing:
+        groups += [(g, [(g,"#<unspecified>")])]
+    
+    result = ""
+    for g, zs in groups:
+        lines   =  '\n    '.join(map(snd,zs))
+        result += ("(define (bind-uniforms-%s usr) \n  (begin\n    %s))\n\n" % 
+                   (g, lines))
+
+    result += """
+(define (bind-uniforms-all x)
+  (begin 
+    (bind-uniforms-sampler x)
+    (bind-uniforms-misc x)
+    (bind-uniforms-material x)
+    (bind-uniforms-mist x)
+    (bind-uniforms-world x)
+    (bind-uniforms-lamp x)
+    (bind-uniforms-object x)))
+
+"""
+    
+    return result
+
 
 def group_attributes(xs):
     xs.sort()
     return "(define (bind-attributes usr) \n  (begin\n    %s))\n\n" % '\n    '.join(xs)
 
-def uniform(t,v,expr):
+                
+
+def uniform(is_global, get_group, t, v, expr):
         
     def show(x, xs):
         if x.leaf_nf:
-            return symbol(x.name)
+            sym = symbol(x.name)
+            if is_global(get_group(sym)):
+                return "(global '%s)" % sym
+            else:
+                return sym
         else:
             b = " ".join(xs)
             return "(%s%s%s)" % (x.name.replace("_","-"), " " if b else "", b)
         
     return "(uniform-%s \"%s\" %s usr)" % (t,v,expr.transform(show))
+
+
 
 def default(expr, seen = set()):
     
@@ -90,13 +157,14 @@ def default(expr, seen = set()):
         if x.leaf_nf:
             sym = symbol(x.name)
             if sym in seen:
-                return ""
+                return []
             else:
                 seen.add(sym)
                 # x.__call__ evaluates fully only because were at a leaf node
-                return "(define %s %s)" % (sym, value(x()))
+                return [(get_group(sym),
+                         "(define %s %s)" % (sym, value(x())))]
         else:
-            return "\n".join(filter(lambda x: x != "", xs))
+            return list(flatten(filter(lambda v: v != [], xs)))
 
     return expr.transform(show)
 

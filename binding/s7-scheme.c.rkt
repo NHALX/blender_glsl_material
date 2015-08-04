@@ -5,7 +5,6 @@
           racket/dict
           racket/path
           racket/format
-          "../misc/math-symbol.rkt"
           "../misc/c-pre.rkt"
           "s7-core.rkt"
           "c-core.rkt")
@@ -50,6 +49,20 @@ ss_result pack_result(s7_scheme *s7, s7_pointer p)
     //result.string = s7_object_to_c_string(s7, val);
     return result;
 }
+
+static s7_pointer
+name_to_value(scheme s, const char *name)
+{
+    s7_pointer v = s7_name_to_value(s.s7, name);
+
+    if (!v){
+        printf("warning: %s: not found.\n", name);
+        return NULL;
+    } 
+
+    return v;
+}
+
 
 ss_result
 ss_get(scheme s, const char *name)
@@ -134,7 +147,7 @@ const void* s7_object_value_s(s7_scheme *sc, int type_id, s7_pointer p)
 
       })
 
-@(map (← apply read-safe) safe-conversion-table)
+@(map (⤶ apply read-safe) safe-conversion-table)
   
 
 /*
@@ -174,18 +187,92 @@ scheme ss_init()
 ┗━┓┗━┓╺━╸┣╸ ┃┏┛┣━┫┃  
 ┗━┛┗━┛   ┗━╸┗┛ ╹ ╹┗━╸
 */
-  
-ss_result ss_load(scheme s, const char *file)
+
+
+#define ENV_MAX_SIZE 4096
+
+ss_result ss_env_new(scheme s, const char *name)
 {
-    return pack_result(s.s7, s7_load(s.s7, file)); // TODO: eval in tighter env
+    char buf[ENV_MAX_SIZE];
+    snprintf(buf, sizeof buf, "(define %s (inlet))", name);
+    return ss_eval(s, buf, NULL);
 }
 
-ss_result ss_eval(scheme s, const char *buffer)
+
+ss_env ss_env_enter(scheme s, const char *name)
 {
-    return pack_result(s.s7, s7_eval_c_string(s.s7, buffer));
+    s7_pointer e = name_to_value(s, name);
+
+    if (!e)
+        return NULL;
+    else
+    {
+        s7_pointer old = s7_set_curlet(s.s7, e);
+        s7_gc_protect(s.s7, old);
+        return old;
+    }
 }
 
-  
+void ss_env_exit(scheme s, ss_env e)
+{
+    if (e){
+        s7_gc_unprotect(s.s7, e);
+        s7_set_curlet(s.s7, e);
+    }
+}
+
+
+ss_result ss_load(scheme s, const char *file, const char *env_name)
+{
+    if (env_name)
+    {
+        char buf[ENV_MAX_SIZE];
+        snprintf(buf, sizeof buf, "(load \"%s\" %s)", file, env_name);
+        return ss_eval(s, buf, NULL);
+    }
+    else
+        return pack_result(s.s7, s7_load(s.s7, file)); 
+}
+
+ss_result ss_eval(scheme s, const char *code, const char *env)
+{
+    if (env)
+    {
+        s7_pointer e = name_to_value(s, env);
+
+        if (!e)
+            return result_not_found;
+        else
+            return pack_result(s.s7, 
+                               s7_eval_c_string_with_environment(s.s7, 
+                                                                 code,
+                                                                 e));
+    }
+
+    return pack_result(s.s7, s7_eval_c_string(s.s7, code));
+}
+
+
+// caller must free string result
+char* ss_seval(scheme s, const char *code, const char *env)
+{
+    s7_pointer result;
+
+    if (env)
+    {
+        s7_pointer e = name_to_value(s, env);
+
+        if (!e)
+            return NULL;
+
+        result = s7_eval_c_string_with_environment(s.s7, code, e);
+    }
+    else
+        result = s7_eval_c_string(s.s7, code);
+
+    return s7_object_to_c_string(s.s7, result);
+}
+
 
 #ifdef __cplusplus
 }

@@ -15,6 +15,7 @@
          (import "BlenderObject")
          (import "BlenderRenderState")
          (import "BindUniform")
+         (import "RenderState")
          (import* ".."))
  @begin/text{
   
@@ -30,8 +31,9 @@
   #include "generated/linear-algebra.h"
   @BlenderObject:header-source
   @BlenderRenderState:header-source
+  @RenderState:header-source
   #include <cstdarg>
-
+  #include <zmq.h>
 
   bool loadShaderSource(osg::Shader* obj, const std::string& fileName )
   {
@@ -234,15 +236,19 @@ osg::Geode* createAxis()
 
   void material_update_camera(osg::Camera *camera)
   {
-      osg::Matrix *view = new osg::Matrix;
-      osg::Matrix *view_inv = new osg::Matrix;
+      osg::Matrix view;
+      osg::Matrix view_inv;
 
-      view->orthoNormalize(sync_matrix(camera->getViewMatrix()));
-      view_inv->orthoNormalize(sync_matrix(camera->getInverseViewMatrix()));
-      // view_inv->invert(*view);  // Warning: dont double transpose on accident
-
-      ss_set_m44_t(_scheme, "<world=>camera>", view);
-      ss_set_m44_t(_scheme, "<camera=>world>", view_inv);
+      // Warning: dont double transpose by accident
+      view.orthoNormalize(sync_matrix(camera->getViewMatrix()));
+      view_inv.orthoNormalize(sync_matrix(camera->getInverseViewMatrix()));
+  
+      // fresh allocation is required for pointer ownership reasons
+      ss_env env = ss_env_enter(_scheme, "global");
+      ss_set_m44_t(_scheme, "camera-<world=>camera>", new osg::Matrix(view));
+      ss_set_m44_t(_scheme, "camera-<camera=>world>", 
+                            new osg::Matrix(view_inv));
+      ss_env_exit(_scheme, env);
   }
 
 
@@ -273,23 +279,27 @@ osg::Geode* createAxis()
 
       /////////////////
 
-      osg::ref_ptr<osgAnimation::BasicAnimationManager> manager = NULL;
+      @(c:var "osg::ref_ptr<osgAnimation::BasicAnimationManager>" 
+        manager)
 
-      @(node:fold "osg::ref_ptr<osgAnimation::BasicAnimationManager>" 
-        "manager" "obj" find-animation-manager)
+      manager = NULL;
+
+      @(node:fold manager "obj" find-animation-manager)
 
 
       if (manager.valid())
       {
           obj->setUpdateCallback(manager);
 
-          @(c:for-each "osgAnimation::AnimationList" 
-            "manager->getAnimationList()"
+          @(c:for-each 
             @c:λ[(x)]{
                     std::cout << "animation: " 
                               << @|x|->getName()
                               << std::endl;
-                })
+                }
+
+            (c:type-info "manager->getAnimationList()" 
+                         "osgAnimation::AnimationList"))
 
           osg::ref_ptr<osgAnimation::Animation> animation;
 
@@ -312,77 +322,150 @@ osg::Geode* createAxis()
   }
 
 
+  void print_path(osg::Node &x)
+  {
+      osg::NodePathList paths = x.getParentalNodePaths();
+      osg::NodePath path = paths[0];
+
+      @(c:for-each
+        @c:λ[(p)]{
+            const std::string& name = @|p|->getName();
+            osg::notify(osg::WARN) 
+              << "/"
+              //      << static_cast<void*>(@|p|)
+              //      << ":"
+              << (name.empty() ? "???" : name)
+              << "("
+              << @|p|->className()
+              << ")";
+          }
+        (c:type-info "path" "osg::NodePath"))
+             
+
+      osg::notify(osg::WARN) 
+        << std::endl;    
+  }
+
+
+
+
+  std::string debug_node(osg::Node *node)
+  {
+      const std::string& name = node->getName();
+      std::ostringstream os;
+      os
+        << (name.empty() ? "???" : name)
+        << ":"
+        << node->className();
+
+      return os.str();
+  }
+
+  void debug_tree(std::string parent, osg::Node *node)
+  { 
+      if (!node)
+          return;
+
+      parent += "/";
+      parent += debug_node(node);
+      osg::Group *g = node->asGroup();
+
+      if (!g)
+          std::cout << parent << std::endl;
+      
+      else
+        for (int i = 0; i < g->getNumChildren(); ++i)
+          debug_tree(parent, g->getChild(i));
+      
+  }
+ 
+
+
+
+  @c:define[(print-key-val kv)]{
+           osg::notify(osg::WARN) 
+             << @|kv|.first
+             << ' ' 
+             << @|kv|.second 
+             << std::endl;
+  }
+
+
+
   void Core::mainloop()
   {    
-  //    osg::ref_ptr<osg::Group> scene = test_scene();
-  //    printf("ref:%d\n",scene->referenceCount());
-      //abort();
+      Environment env = env("test/");
 
-      osg::ref_ptr<BlenderMaterial> material = new 
-        BlenderMaterial("test/material");
+      env.load_object("object:0", "export/Plane.001.fbx");
 
+
+
+      @(c:for-each 
+        @c:λ[(material)]{
+            @|material|.second->preload_samplers(&p_env);
+            scene->addChild(@|material|.second);
+        } 
+        (c:type-info "materials" 
+                     "std::map<std::string,BlenderMaterial*>"))
+
+
+      //set_animation(BLEND_OBJ); 
       
-      osg::ref_ptr<BlenderObject> BLEND_OBJ = new 
-        BlenderObject(material, osgDB::readNodeFile("mattest.fbx"));
-
-      set_animation(BLEND_OBJ);
-      
-        ///////////////////////
+      ///////////////////////
       osg::ref_ptr<osg::Group> blender = blenderRenderState();   
-      osg::ref_ptr<ShadowGroup> sg     = new ShadowGroup(material);
-      PreloadEnv p_env = {sg};
-
-      material->preload_samplers(&p_env);
-      material->addChild(BLEND_OBJ);
-
-      blender->addChild(material);
+      scene->setName("scene");
+      blender->addChild(scene);
       blender->addChild(sg);
       blender->addChild(createAxis());
 
-      @(node:for-each "blender"
-        @c:λ[(x)]{
+      /*
+      @(node:for-each "fbx_scene"
+        @c:λ[(x)]{ print_path(@|x|); })
+      */
+      const char* port = "tcp://127.0.0.1:5555";
 
-            osg::NodePathList paths = @|x|.getParentalNodePaths();
-            osg::NodePath path = paths[0];
+      @(define bind-failure @S{
+          std::cerr 
+            << "error: failed to bind: " << port
+            << " -- errno: "             << errno
+            << std::endl;
 
-            @(c:for-each "osg::NodePath" "path"
-                @c:λ[(p)]{
-                  const std::string& name = @|p|->getName();
-                  osg::notify(osg::WARN) 
-                    << "/"
-                    << static_cast<void*>(@|p|)
-                    << ":"
-                    << (name.empty() ? "???" : name);
-                })
-            
+          return;
+        })
 
-            osg::notify(osg::WARN) 
-              << std::endl;
-          })
-
-      osg::notify(osg::WARN) 
-        << "root: "
-        << static_cast<void*>(viewer)
-        << std::endl;
+      @(c:guard bind-failure
+        !NULL : void* zmq = "zmq_ctx_new()"
+        !NULL : void*  sd = "zmq_socket(zmq, ZMQ_REP)"
+                        0 = "zmq_bind(sd, port)")
+          
 
       viewer->setSceneData(blender);
       viewer->stopThreading();
-
-
-      // root->setCullingActive(false);  // TODO: remove this
-
-      //viewer->setSceneData(scene); //compose3(sg,blender,scene));//compose3(sg, blender, scene));
-
       viewer->realize(); 
 
       while( !viewer->done() )
-      {    
+      {
+          char buf[4096];
+          const char *result;
+          int n;
+
+          if ((n = zmq_recv(sd, buf, sizeof buf, ZMQ_DONTWAIT)) != -1)
+          {
+              // TODO: sanitize
+              result = ss_seval(_scheme, (const char*) buf, NULL);
+              n      = zmq_send(sd, result, strlen(result), ZMQ_DONTWAIT);
+
+              if (n == -1)
+                  std::cerr << "warning: dropped reply" << std::endl;
+              
+              free((void*) result);
+          }
+
+          material_update_camera(viewer->getCamera());
+
           viewer->advance();
           viewer->eventTraversal();
           viewer->updateTraversal();
-          material_update_camera(viewer->getCamera());
-          //extern void applyLampCamera(const char *id, osg::Camera *shadow);
-          //applyLampCamera("lamp-0", viewer->getCamera());
           viewer->renderingTraversals();
       }
 
@@ -396,17 +479,18 @@ osg::Geode* createAxis()
       _scheme = ss_init();
       ss_import_linear_algebra(_scheme, NULL);
       ss_import_uniform(_scheme, NULL);
-      ss_eval(_scheme, "(apply varlet (curlet) linear-algebra)");
-      ss_eval(_scheme, "(apply varlet (curlet) uniform)");
-      ss_load(_scheme, "../shader-link/shader-link.scm"); // TODO: error check
-      ss_eval(_scheme, "(unit-test:shader-link)");
-
+      // TODO: error check
+      ss_eval(_scheme, "(apply varlet (curlet) linear-algebra)", NULL);
+      ss_eval(_scheme, "(apply varlet (curlet) uniform)", NULL);
+      ss_load(_scheme, "../shader-link/shader-link.scm", NULL); 
+      ss_eval(_scheme, "(unit-test:shader-link)", NULL);      
+      
       Core *core = new Core;
       core->db_init();
       core->manipulator_init();
       core->camera_init();
       core->mainloop();
-
+      
       ss_free(_scheme);
   }
 

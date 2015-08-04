@@ -10,7 +10,8 @@
 (define ld-flags
   @S{-L../../osg/lib -L../obj/ -Wl,-Bdynamic -losg -losgViewer 
                      -losgManipulator -losgGA -losgDB -losg 
-                     -losgShadow -losgUtil -losgAnimation})
+                     -losgShadow -losgUtil -losgAnimation
+                     -lzmq})
 
 (define obj-dir "../obj/render-osg/")
 
@@ -28,15 +29,21 @@
 
 
 (define files:ccr⟹obj
-  ;; TODO: ext-ccr? filter doesnt handle when changes are made to c-pre.
-  (let [[xs (module-deps ext-ccr? main-module)]] 
-    (map cons xs (map (⤶ gen-obj-file obj-dir) xs))))
+  ;; TODO: file-extension? filter doesnt handle when changes are made to c-pre.
+  (let* [[pred  (⤶ file-extension? ".cc.rkt")]
+         [xs    (module-deps pred main-module)]] 
+
+    (map cons 
+         xs 
+         (map (⤶ gen-obj-file obj-dir) xs))))
 
 (define files:glsl-in⟹glsl
-  (let [[xs (list "test/material.vert.in"
-                  "test/material.frag.in")]
+  (let [[xs (filter (⤶ file-extension? ".in") 
+                    (directory-list "test/" #:build? #t))]
         [gen-out (⤷ path-replace-suffix "")]]
+
     (map cons xs (map gen-out xs))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (glsl-in⟹glsl in out)

@@ -25,9 +25,9 @@
       }
     
   public:
-      BlenderObject(osg::ref_ptr<BlenderMaterial>, osg::ref_ptr<osg::Node>);
+      BlenderObject(BlenderMaterial*, osg::Node *);
       
-      osg::ref_ptr<osg::Program> _program;
+      osg::ref_ptr<BlenderMaterial> _material;
 	    
       static void *bind_attributes(void * const ctx,
                                    osg::Geode &geode,
@@ -80,14 +80,17 @@
   #include "Traversal.hh"
   #include <stdexcept>
 
+ 
+
+
 
   BlenderObject::BlenderObject(
-      osg::ref_ptr<BlenderMaterial> material, 
-      osg::ref_ptr<osg::Node> node)
+      BlenderMaterial *material, 
+      osg::Node *node)
   {
       //getOrCreateStateSet();
       setName("BlenderObject");
-      _program = material->getProgram();
+      _material = material;
       addChild(node);
       FoldGeodeGeometry fold = FoldGeodeGeometry(bind_attributes, this);
       node->accept(fold);
@@ -136,10 +139,12 @@
   {                
       BlenderObject *self = (BlenderObject*) ctx;
       geode.setNodeMask(CastsShadowTraversalMask|ReceivesShadowTraversalMask);
-      bind_target target = {self->_program,self,g};
-      //const real * const mark = vs_mark(_scheme.vs);
+      bind_target target = {self->_material->getProgram(), self, g};
+
+      ss_env env = ss_env_enter(_scheme, self->_material->getName().c_str());
       ss_call1p(_scheme, "bind-attributes", &target);
-      //vs_reset_to(_scheme.vs, mark);
+      ss_env_exit(_scheme, env);
+
       return ctx;
   }
  

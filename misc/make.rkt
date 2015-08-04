@@ -6,7 +6,8 @@
 (require "dep-graph.rkt")
 (require "../misc/NHA.rkt")
 
-(provide gen-obj-file outdated? subsys module-deps S make ext-ccr?
+(provide gen-obj-file outdated? subsys module-deps S make 
+         file-extension?
          exec exec-simulate
          cat
          (all-from-out racket/base)
@@ -65,12 +66,15 @@
 
  
 
-(define (ext-ccr? x)
-  (let* {[suffix    (regexp-quote ".cc.rkt")]
-         [criteria  (regexp (S ".*" suffix))]}
-    
-    (regexp-match? criteria 
-                   (path->string x))))
+
+
+(define (file-extension? suffix x)
+  (define criteria
+    (regexp (S ".*" (regexp-quote suffix))))
+
+  (regexp-match? criteria 
+                 (path->string x)))
+
 
 (define (cat a b c)
   (call-with-input-file a

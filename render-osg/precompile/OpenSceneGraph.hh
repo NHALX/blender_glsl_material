@@ -22,6 +22,7 @@
 #include <osg/Geometry>
 #include <osg/Texture2D>
 #include <osgDB/ReadFile>
+#include <osgDB/WriteFile>
 #include <osgDB/FileUtils>
 #include <osgViewer/Viewer>
 #include <osgViewer/CompositeViewer>

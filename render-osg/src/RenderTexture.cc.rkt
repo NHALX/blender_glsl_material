@@ -110,6 +110,7 @@
           break;
       }
 
+      setName("RenderTexture");
       addChild(scene);
   }
       

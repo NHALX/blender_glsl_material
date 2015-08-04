@@ -3,7 +3,7 @@ from mathutils import Matrix, Vector, Color
 from io_material_glsl.format.internal import Expr, Val
 import io_material_glsl.shadelink as shade
 
-# morph: GPUDynamicType -> (BlenderDNA -> ExpressionTree)
+# unf_to_expr: GPUDynamicType -> (BlenderDNA -> ExpressionTree)
 unf_to_expr = {
     
     # SAMPLER        
@@ -40,7 +40,9 @@ unf_to_expr = {
         Val("material-specular-intensity", m.specular_intensity),
     
     gpu.GPU_DYNAMIC_MAT_HARD    : lambda m:
-        Val("material-specular-hardness", float(m.specular_hardness)), #FIXME: float() HACK
+        #FIXME: float() HACK
+        Val("material-specular-hardness", float(m.specular_hardness)), 
+
     
     gpu.GPU_DYNAMIC_MAT_REF     : lambda m:
         Val("material-diffuse-intensity", m.diffuse_intensity),
@@ -56,10 +58,10 @@ unf_to_expr = {
         Val("object-<world=>obj>", o.matrix_world.inverted()),
     
     gpu.GPU_DYNAMIC_OBJECT_VIEWMAT       : lambda o, cam2w, w2c:
-        Val("<world=>camera>", w2c),
+        Val("camera-<world=>camera>", w2c), #TODO: handle this camera group naming
 
     gpu.GPU_DYNAMIC_OBJECT_VIEWIMAT      : lambda o, cam2w, w2c:
-        Val("<camera=>world>", cam2w),
+        Val("camera-<camera=>world>", cam2w),
     
     gpu.GPU_DYNAMIC_OBJECT_COLOR         : lambda o, cam2w, w2c:
         #HACK: convert o.color: bpy_prop_array -> tuple
@@ -90,7 +92,8 @@ unf_to_expr = {
         Val("mist-min-intensity", mt.intensity),
     
     gpu.GPU_DYNAMIC_MIST_COLOR     : lambda mt:
-        Val("mist-color", mt.color),
+        Expr(shade.v4_v3,
+             Val("mist-color", mt.color)),
     
     gpu.GPU_DYNAMIC_MIST_ENABLE    : lambda mt:
         Expr(shade.bool_to_float,
@@ -141,28 +144,28 @@ unf_to_expr = {
                  l.data.shadow_buffer_clip_end),
              Val(("lamp-{}-<world=>lamp>", l.name),
                  l.matrix_world.inverted()),
-             Val("<camera=>world>",
+             Val("camera-<camera=>world>",
                  cam2w)),
     
     gpu.GPU_DYNAMIC_LAMP_DYNIMAT    : lambda l, cam2w, w2c:
         Expr(shade.lamp_imat,
              Val(("lamp-{}-<world=>lamp>", l.name),
                  l.matrix_world.inverted()),
-             Val("<camera=>world>",
+             Val("camera-<camera=>world>",
                  cam2w)),
 
     gpu.GPU_DYNAMIC_LAMP_DYNVEC     : lambda l, cam2w, w2c:
         Expr(shade.lamp_dynvec,
              Val(("lamp-{}-<lamp=>world>", l.name),
                  l.matrix_world),
-             Val("<world=>camera>",
+             Val("camera-<world=>camera>",
                  w2c)),
 
     gpu.GPU_DYNAMIC_LAMP_DYNCO      : lambda l, cam2w, w2c:
         Expr(shade.lamp_dynco,
              Val(("lamp-{}-<lamp=>world>", l.name),
                  l.matrix_world),
-             Val("<world=>camera>",
+             Val("camera-<world=>camera>",
                  w2c)),
 
 }
@@ -176,6 +179,28 @@ glt_to_str = { gpu.GPU_DATA_1I  : "1i",
                gpu.GPU_DATA_4UB : "4ubv",
                gpu.GPU_DATA_9F  : "Matrix3fv",
                gpu.GPU_DATA_16F : "Matrix4fv" }
+
+
+group_to_str = { gpu.GPU_DYNAMIC_GROUP_MISC    : "misc",
+                 gpu.GPU_DYNAMIC_GROUP_SAMPLER : "sampler",
+                 gpu.GPU_DYNAMIC_GROUP_MIST    : "mist",
+                 gpu.GPU_DYNAMIC_GROUP_WORLD   : "world",
+                 gpu.GPU_DYNAMIC_GROUP_MAT     : "material",
+                 gpu.GPU_DYNAMIC_GROUP_LAMP    : "lamp",
+                 gpu.GPU_DYNAMIC_GROUP_OBJECT  : "object" }
+
+all_groups = group_to_str.values()
+
+def get_group(var_name):
+    return var_name.split("-")[0]
+
+# 'camera' is not a real blender group, but why put the camera with 'object'?
+def is_global_group(x):
+    return ((x == "misc") 
+         or (x == "camera") 
+         or (x == "mist") 
+         or (x == "world") 
+         or (x == "lamp"))
 
 
 def convert_uniform(mat, uniform):
@@ -204,7 +229,10 @@ def convert_uniform(mat, uniform):
     to_expr     = unf_to_expr[uniform["type"]]
     environment = group_to_env[uniform["type-group"]]()
 
-    return (glt_to_str[uniform["datatype"]], uniform["varname"], to_expr(*environment))
+    return (group_to_str[uniform["type-group"]],
+            glt_to_str[uniform["datatype"]], 
+            uniform["varname"], 
+            to_expr(*environment))
 
 
 

@@ -19,6 +19,12 @@
   (v3-v4 (m44-col m i)))
 
 
+(define global 
+  (inlet))
+
+(define with-namespace 
+  with-let)
+
 
 ;; ┏┓ ╻  ┏━╸┏┓╻╺┳┓┏━╸┏━┓
 ;; ┣┻┓┃  ┣╸ ┃┗┫ ┃┃┣╸ ┣┳┛

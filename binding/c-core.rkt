@@ -59,8 +59,8 @@
   (map f
        (remove-duplicates
         (apply append
-         (map (∘ (← filter pred)
-                 (→ dict-ref `types))
+         (map (∘ (⤶ filter pred)
+                 (⤷ dict-ref `types))
               import-values)))))
 
 

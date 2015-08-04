@@ -45,19 +45,20 @@ def map_atr(mat, attribute, lang):
                 
 def map_u(mat, uniform, seen, lang):
 
-    data, name, expr = io_material_glsl.dnalink.convert_uniform(mat, uniform)
+    group, data, name, expr = io_material_glsl.dnalink.convert_uniform(mat, uniform)
     import test_export
     test_export.test_conversion(uniform, expr)
 
-    return (lang.default(expr,seen), lang.uniform(data, name, expr))
+    return (lang.default(expr,seen), 
+            (group, 
+             lang.uniform(io_material_glsl.dnalink.is_global_group, 
+                          io_material_glsl.dnalink.get_group,
+                          data, name, expr)))
     
 
 
 
-def test():
-    scene = bpy.context.scene
-    materials = bpy.data.materials
-    mat =  materials[0]
+def export(scene, mat):
     
     shader = gpu.export_shader(scene, mat)
     
@@ -111,9 +112,9 @@ def test():
         
     seen = set()
     for uniform in shader["uniforms"]:        
-        d, u = map_u(mat, uniform, seen, io_material_glsl.format.s_expression)
-        if d:
-            us1 += [d]
+        defs, u = map_u(mat, uniform, seen, 
+                        io_material_glsl.format.s_expression)
+        us1 += defs
         us2 += [u]
     
     for attribute in shader["attributes"]:
@@ -125,6 +126,8 @@ def test():
     #print('\n'.join(us1))
    # print('\n'.join(us2))
     #print(ats)
+
+# TODO: fix this header stuff
     header = """
 #version 130
 #extension GL_ARB_texture_query_lod : enable
@@ -135,7 +138,7 @@ def test():
 
 #define BUMP_BICUBIC 1
 """
-    file = "/home/nha/data/blender_glsl_material/render-osg/test/material"
+    file = "/home/nha/data/blender_glsl_material/render-osg/test/" + mat.name
     try:
         os.remove(file + ".vert")
         os.remove(file + ".frag")
@@ -157,12 +160,19 @@ def test():
         bind_txt = "(define (bind-samplers usr)\n  (begin\n    %s))\n\n" % ('\n    '.join(bindtex))
         texvars_txt = '\n'.join(texvars) + '\n\n'
 
-        f.write(io_material_glsl.format.s_expression.group_defines(us1))
+        f.write(io_material_glsl.format.s_expression.group_defines(
+            io_material_glsl.dnalink.is_global_group, 
+            io_material_glsl.dnalink.get_group,
+            us1))
+
         f.write(texvars_txt)
         f.write(preload_txt)
         f.write(bind_txt)
         
-        f.write(io_material_glsl.format.s_expression.group_uniforms(us2))
+        f.write(io_material_glsl.format.s_expression.group_uniforms(
+            io_material_glsl.dnalink.all_groups,
+            us2))
+
         f.write(io_material_glsl.format.s_expression.group_attributes(ats))
     
 
