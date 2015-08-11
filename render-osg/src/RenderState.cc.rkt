@@ -1,42 +1,40 @@
 #lang reader "../../misc/CSPL15.rkt"
-| top-level (require "../../misc/c-pre-stdlib.rkt") |
-| import "Matrix"
-         #include <stdio.h>
-         "BlenderMaterial" 
-         "BlenderObject"
-         "BlenderRenderState"
-         "BindUniform" |
+| head #include "OpenSceneGraph.hh" |
+| import
+  "Matrix"
+  #include <stdio.h>
+  "BlenderRenderState"
+  "BindUniform" |
+
 
 @(c:class RS (materials    : public  "std::map<std::string,BlenderMaterial*>")
              (objects      : public  "std::map<std::string,BlenderObject*>")
-             (_scene       : private "osg::ref_ptr<osg::Group>")
-             (_sg          : private "osg::ref_ptr<ShadowGroup>")
-             (_matdir      : private "std::string")
-             (_preload_env : private "PreloadEnv"))
+             (preload_env  : public  "PreloadEnv")
+             (scene        : public  "osg::ref_ptr<osg::Group>")
+             (sg           : public  "osg::ref_ptr<ShadowGroup>")
+             (_matdir      : private "std::string"))
 
 
-@ƒ[
- RS RS (public "" (std::string root))
-]{
-    _matdir      = root;
-    _scene       = new osg::Group();
-    _sg          = new ShadowGroup(scene);
-    _preload_env = {sg}; 
+@constructor[RS public ((std::string root))]{
+    _matdir         = root;
+    scene           = new osg::Group();
+    sg              = new ShadowGroup(scene);
+    preload_env.sg  = sg; // TODO: kill seperate sg reference
  }
 
 
 @ƒ[
- RS material_merge_dir (public void)
+ RS material_merge_dir (public void (std::string material_root))
 ]{
     std::map<std::string, BlenderMaterial*> ms = 
       material::directory_load_all(material_root);
 
-    materials.insert(ms.begin(), ms.end())
+    materials.insert(ms.begin(), ms.end());
  }
 
 
 @ƒ[
- RS load_object (public void (std::string id) (std::string file))
+ RS load_object (public bool (std::string id) (std::string file))
 ]{                                                      
     osg::ref_ptr<osg::Node> object = osgDB::readNodeFile(file);
 
@@ -55,10 +53,10 @@
 @ƒ[
  attach_meshes
  (static void
-   ("std::multimap<std::string, osg::Node *>&"       meshes)
-   ("const std::map<std::string, BlenderMaterial*>&" materials))
+   ("std::multimap<std::string, osg::Node *>&" meshes)
+   ("std::map<std::string, BlenderMaterial*>&" materials))
 ]{
-    for (const std::map<std::string, BlenderMaterial*>::const_iterator
+    for (std::map<std::string, BlenderMaterial*>::const_iterator
          i0  = materials.begin();
          i0 != materials.end();
          i0++)
@@ -69,8 +67,8 @@
          ret = meshes.equal_range((*i0).first);
 
          for (std::multimap<std::string, osg::Node *>::iterator
-              i1  = ret.second;
-              i1 != ret.first;
+              i1  = ret.first;
+              i1 != ret.second;
               i1++)
          {
               std::cout << "Allocating blend obj\n";

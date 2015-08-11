@@ -7,7 +7,7 @@
 
 @;; generates boilerplate for OSGs visitor pattern
 
-@c:define[(node:fold 
+@Λ[(node:fold 
            result-var obj f ;; TODO: handle state-type right
            #:class-name [name (uid-counter "__node_fold_struct_")] 
            #:state-type [stype (c:type-info-type result-var)])]{
@@ -36,7 +36,7 @@
  }}
 
 
-@c:define[(node:for-each 
+@Λ[(node:for-each 
            #:class-name [name (uid-counter "__node_for_each_struct_")]
            obj f)]{
 
