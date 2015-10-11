@@ -1,4 +1,5 @@
 #lang at-exp s-exp "../misc/make.rkt"
+(provide build-unit)
 
 (define racket "/usr/local/bin/racket")
 (define cc     "/usr/bin/gcc")
@@ -15,10 +16,8 @@
 
 (define obj-dir "../obj/render-osg/")
 
-(define main-module "src/ShaderTest.cc.rkt")
 
-(define dep-graph
-  (module-deps (file-in-subdir? "src/") main-module))
+
 
 (define files:hh⟹gch
   
@@ -30,12 +29,12 @@
     (map cons hhs (map gen-out hhs))))
 
  
-(define files:ccr⟹obj
+(define (files:ccr⟹obj deps)
   ;; TODO: file-extension? filter doesnt handle when changes are made to c-pre.
   (let* [[pred  (file-extension? ".cc.rkt")]
          [xs    (filter pred
                         (reverse
-                         (tsort dep-graph)))]]
+                         (tsort deps)))]]
     
     (for-each (⤶ printf "wtf: ~a\n") xs)
     (map cons 
@@ -61,31 +60,7 @@
 (define (hh⟹gch in out)
   ((subsys) @S{@|cc| -c @|c-flags| @|in| -o @|out|}))
 
-(define (ccr⟹obj in out)
-  
-  (define (gen-interm in suffix)
-    (build-path "generated"
-                (file-name-from-path
-                 (path-replace-suffix in suffix))))
 
-  (define src-cc
-    (gen-interm in ".cc"))
-
-  ((subsys)   
-   #:out-fp (gen-interm in ".h")
-   #:exists 'replace 
-   (format "~a ~a --exports" racket in))
-    
-  ((subsys)   
-   #:out-fp src-cc
-   #:exists 'replace 
-   (format "~a ~a" racket in))
-
-  ((subsys)
-   #:in-fp src-cc
-   (format "~a ~a -c ~a -o ~a" c++ src-cc c-flags out))
-
-  (void)) 
 
 
 (define (link obj-paths output)
@@ -103,11 +78,14 @@
   (when (findf (λ (x) (outdated? #f (cons x output))) objs)
     ((subsys) command))) ; TODO: return value check
 
-(define (all)
+(define (all root)
+  (define deps
+    (module-deps (file-in-subdir? "src/") root))
+  
   (make glsl-in⟹glsl files:glsl-in⟹glsl)
   (make hh⟹gch       files:hh⟹gch)
-  (make ccr⟹obj      files:ccr⟹obj
-        #:dep-tree dep-graph)
+  (make ccr⟹obj      (files:ccr⟹obj deps)
+        #:dep-tree deps)
   
   (link (map cdr files:ccr⟹obj) "bind"))
 
@@ -121,8 +99,14 @@
   (apply exec #:in-fp in #:out-fp out #:exists exists-flag xs))
 
 
+(define (build-unit file)
+  (parameterize [[subsys execute]] (all file)))
 
-(parameterize [[subsys execute]] (all))
+(module+ test
+    (parameterize [[subsys execute]]
+      (all "src/Shadow.cc.rkt")
+      #;(all "src/ShaderTest.cc.rkt")))
+
 
 ;(all)
 

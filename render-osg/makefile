@@ -6,7 +6,7 @@ SRCDIR = ./src
 INCLUDES:=-I../ -I../../osg/include/ -I../embed/s7/ -I$(SRCDIR)
 CFLAGS := $(INCLUDES) 
 #CFLAGS+=-flto -fdata-sections -ffunction-sections -Wl,--gc-sections -fmerge-all-constants
-CFLAGS += -ggdb -g3 -g -O0
+CFLAGS += -ggdb -g3 -g -O0 -std=c++1y
 #CFLAGS += -DWITH_LINEAR_ALGEBRA -DWITH_SHADER_LINK -DWITH_UNIFORM 
 CFLAGS += -DWITH_LINEAR_ALGEBRA -DWITH_UNIFORM
 

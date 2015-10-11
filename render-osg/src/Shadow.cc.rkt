@@ -1,82 +1,72 @@
-#lang reader "../../misc/CSPL15.rkt"
-| head #include "OpenSceneGraph.hh" |
-| import
-  "Matrix"
-  "RenderTexture" |
+#lang reader "../../CSPL15/CSPL15.rkt"
+(require "language-ext.rkt")
+(include-head: "OpenSceneGraph.hh")
 
-#include "generated/scheme.h"
-#include <stdexcept>
+(import: "Matrix")
+(import: "RenderTexture") 
+(include: "generated/scheme.h")
+(include: <stdexcept>)
 
-extern scheme _scheme;
-
-
-  // TODO: these should be elsewhere
-  #define MATRIX_FIELDS(X)                   \
-    (*(X))(0,0),(*(X))(0,1),(*(X))(0,2),(*(X))(0,3), \
-    (*(X))(1,0),(*(X))(1,1),(*(X))(1,2),(*(X))(1,3), \
-    (*(X))(2,0),(*(X))(2,1),(*(X))(2,2),(*(X))(2,3), \
-    (*(X))(3,0),(*(X))(3,1),(*(X))(3,2),(*(X))(3,3)					
-
-  #define MATRIX_FIELDS_TRANSPOSED(X)\
-    (*(X))(0,0),(*(X))(1,0),(*(X))(2,0),(*(X))(3,0), \
-    (*(X))(0,1),(*(X))(1,1),(*(X))(2,1),(*(X))(3,1), \
-    (*(X))(0,2),(*(X))(1,2),(*(X))(2,2),(*(X))(3,2), \
-    (*(X))(0,3),(*(X))(1,3),(*(X))(2,3),(*(X))(3,3)
-
-  const int ReceivesShadowTraversalMask = 0x1;
-  const int CastsShadowTraversalMask = 0x2;
+(𝑣: _scheme ∷ (extern) ⇒ "scheme")
 
 
-@(c:typedef "double" "degrees")
-@(c:typedef "double" "radians")
-@(c:typedef "std::string" "ID")
+;;;;;;;;;;;;;
+; TODO: these should be elsewhere
 
-@(c:class SpotLamp
-  (shadow : private "osg::ref_ptr<RenderTexture>")
-  (id     : public "const char *"))
+(define (matrix-fields X)
+  { (*(X))(0,0),(*(X))(0,1),(*(X))(0,2),(*(X))(0,3), 
+    (*(X))(1,0),(*(X))(1,1),(*(X))(1,2),(*(X))(1,3), 
+    (*(X))(2,0),(*(X))(2,1),(*(X))(2,2),(*(X))(2,3), 
+    (*(X))(3,0),(*(X))(3,1),(*(X))(3,2),(*(X))(3,3)	})
 
-@(c:namespace++ `SpotLamp "friend class ShadowGroup;")
+(define (matrix-fields-transposed X)
+  { (*(X))(0,0),(*(X))(1,0),(*(X))(2,0),(*(X))(3,0), 
+    (*(X))(0,1),(*(X))(1,1),(*(X))(2,1),(*(X))(3,1), 
+    (*(X))(0,2),(*(X))(1,2),(*(X))(2,2),(*(X))(3,2), 
+    (*(X))(0,3),(*(X))(1,3),(*(X))(2,3),(*(X))(3,3) })
 
-
-@constructor[SpotLamp protected
-    (("const char *" name)
-     ("size_t"       width)
-     ("osg::Node *"  scene))
-]{
-    shadow = new RenderTexture(width, width, scene, RenderTexture::DEPTH);
-    id     = (const char*) strdup(name);
- }
+;  const int ReceivesShadowTraversalMask = 0x1;
+;  const int CastsShadowTraversalMask = 0x2;
 
 
-@destructor[SpotLamp protected]{
-    free((void*)id);
-}
+(typedef: "double" "degrees")
+(typedef: "double" "radians")
+(typedef: "std::string" "ID")
+
+(class: SpotLamp
+; TODO: (friend: "ShadowGroup") ; friend class ShadowGroup
+  (private: (𝑟: shadow ∷ "RenderTexture"))
+  (public:  (𝑣: id     ∷ "const char *")))
+
+(constructor: SpotLamp/.protected (name width scene)
+  ∷ "const char *" → "size_t" → "osg::Node *" → "void"
+  { shadow = new RenderTexture(width, width, scene, RenderTexture::DEPTH);
+    id     = (const char*) strdup(name); })
+ 
+
+(destructor: SpotLamp/.protected ∷ "void"
+  { free((void*) id); })
 
 
-@ƒ[
- SpotLamp getShadowBuffer (public "osg::Texture2D*")
-]{
-    return shadow->getTexture();
- }
+(ƒ: SpotLamp/.public/getShadowBuffer () ∷ "osg::Texture2D *"
+  { return shadow->getTexture(); })
 
 
-@(define (get type result name)
-
-    @C{
-    @|type| @|result|;
-    {
+(define (get type result name)
+ {
+   @|type| @|result|;
+   {
         char fmt_buf[1024];
         snprintf(fmt_buf, sizeof fmt_buf - 1, "%s-%s", id, "@|name|");
 
         if (ss_get_@|type|(_scheme, fmt_buf, &@|result|) != 0)
-            std::runtime_error(@C{"error: @|name| not found."});
+            std::runtime_error(@(format "error: ~a not found." name));
     }
-    })
+ })
 
 
-@ƒ[
- SpotLamp syncTransform (public void)
-]{
+(ƒ: SpotLamp/.public/syncTransform () ∷ "void"
+{
     ss_env env = ss_env_enter(_scheme, "global");
     @(get "real" "spotsize" "spot-size")
     @(get "real" "znear" "shadow-buffer-clip-start")
@@ -102,47 +92,36 @@ extern scheme _scheme;
                                            zfar); // TODO: what are the
                                                   // bounds? 40 isnt
                                                   // right
- }
+ })
 
 
 
-
-@(c:class ShadowGroup || "public osg::Node"
-  (_lamps : private "std::map<ID, SpotLamp*>")
-  (_scene : private "osg::ref_ptr<osg::Node>"))
-
-
-@constructor[
- ShadowGroup public (("osg::ref_ptr<osg::Node>" scene))
-]{
-    setName("ShadowNode");
-    _scene = scene;
- }
-
-@destructor[ShadowGroup protected]{
-    return;
-}
+(class: ShadowGroup ∈ "public osg::Node"
+  (private:
+   (𝑣: _lamps ∷ "std::map<ID, SpotLamp*>")
+   (𝑟: _scene ∷ "osg::Node")))
 
 
-@ƒ[
- ShadowGroup getScene (public "osg::ref_ptr<osg::Node>")
-]{
-    return _scene;
- }
+(constructor: ShadowGroup/.public (scene)
+  ∷ "osg::ref_ptr<osg::Node>" → "void"
+  { setName("ShadowNode");
+    _scene = scene; }) 
+
+(destructor: ShadowGroup/.protected ∷ "void"
+  { return; })
 
 
-@ƒ[
- ShadowGroup get (public "SpotLamp *" (ID i))
-]{
-    return _lamps[i];
- }
+(ƒ: ShadowGroup/.public/getScene () ∷ "osg::ref_ptr<osg::Node>"
+  { return _scene; }) 
 
 
+(ƒ: ShadowGroup/.public/get (i) ∷ "ID" → "SpotLamp *"
+  { return _lamps[i]; }) 
 
-@ƒ[
-  ShadowGroup reserveLamp
-  (public "SpotLamp*" ("const char *" name) ("size_t" width))
-]{
+
+(ƒ: ShadowGroup/.public/reserveLamp (name width)
+  ∷ "const char *" → "size_t" → "SpotLamp *"
+  {
       std::map<ID,SpotLamp*>::iterator it;
       std::string id = std::string(name);
 
@@ -163,20 +142,24 @@ extern scheme _scheme;
                            // free'd eventually
           return lp;
       }
-  }
+  })
 
 
 
-@ƒ[
- ShadowGroup traverse (public virtual void (osg::NodeVisitor &nv))
-]{
-      @Λ[(process-lamp lamp)]{
-          @|lamp|.second->syncTransform();
-          @|lamp|.second->shadow->accept(nv);
-      }
-
-      @(c:for-each process-lamp
-         (c:type-info "_lamps" "std::map<ID,SpotLamp*>"))
- }
 
 
+(ƒ: ShadowGroup/.public/traverse (nv)
+  ∷ (virtual) ⇒ "osg::NodeVisitor &" → "void"
+    
+  (define (process-lamp lamp)
+   { @|lamp|.second->syncTransform();
+     @|lamp|.second->shadow->accept(nv); })
+
+  (for-each: process-lamp _lamps))
+
+
+
+(module+ test
+  (ƒ: /main (argc argv) ∷ "int" → "char **" → "int"
+    { printf("test\n");
+      return 0; }))

@@ -1,41 +1,45 @@
-#lang reader "../../misc/CSPL15.rkt"
-| head #include "OpenSceneGraph.hh" |
-| import
-  "Matrix"
-  #include <stdio.h>
-  "BlenderRenderState"
-  "BindUniform" |
+#lang reader "../../CSPL15/CSPL15.rkt"
+(include: "OpenSceneGraph.hh") 
+(import: "Matrix")
+(include: <stdio.h>)
+(import: "BlenderRenderState")
+(import: "BindUniform") 
 
 
-@(c:class RS (materials    : public  "std::map<std::string,BlenderMaterial*>")
-             (objects      : public  "std::map<std::string,BlenderObject*>")
-             (preload_env  : public  "PreloadEnv")
-             (scene        : public  "osg::ref_ptr<osg::Group>")
-             (sg           : public  "osg::ref_ptr<ShadowGroup>")
-             (_matdir      : private "std::string"))
+(class: RS
+  
+  (public:
+   (𝑣: materials   ∷ "std::map<std::string,BlenderMaterial*>")
+   (𝑣: objects     ∷ "std::map<std::string,BlenderObject*>")
+   (𝑣: preload_env ∷ "PreloadEnv")
+   (𝑣: scene       ∷ "osg::ref_ptr<osg::Group>")
+   (𝑣: sg          ∷ "osg::ref_ptr<ShadowGroup>"))
+  
+  (private:
+   (𝑣: _matdir     ∷ "std::string")))
 
 
-@constructor[RS public ((std::string root))]{
-    _matdir         = root;
-    scene           = new osg::Group();
-    sg              = new ShadowGroup(scene);
-    preload_env.sg  = sg; // TODO: kill seperate sg reference
- }
+(constructor: RS/.public (root)
+ ∷ "std::string" → "void"
+ { _matdir         = root;
+   scene           = new osg::Group();
+   sg              = new ShadowGroup(scene);
+   // TODO: kill seperate sg reference
+   preload_env.sg  = sg; })
 
 
-@ƒ[
- RS material_merge_dir (public void (std::string material_root))
-]{
-    std::map<std::string, BlenderMaterial*> ms = 
+(ƒ: RS/.public/material_merge_dir (material_root)
+ ∷ "std::string" → "void"
+ { std::map<std::string, BlenderMaterial*> ms = 
       material::directory_load_all(material_root);
 
-    materials.insert(ms.begin(), ms.end());
- }
+   materials.insert(ms.begin(), ms.end()); })
 
 
-@ƒ[
- RS load_object (public bool (std::string id) (std::string file))
-]{                                                      
+
+(ƒ: RS/.public/load_object (id file)
+ ∷ "std::string" → "std::string" → "bool" 
+ {                                                      
     osg::ref_ptr<osg::Node> object = osgDB::readNodeFile(file);
 
     if (!object)
@@ -47,15 +51,16 @@
 
     attach_meshes(meshes, materials);
     return true;
- }
+ })
 
 
-@ƒ[
- attach_meshes
- (static void
-   ("std::multimap<std::string, osg::Node *>&" meshes)
-   ("std::map<std::string, BlenderMaterial*>&" materials))
-]{
+
+(ƒ: attach_meshes (meshes materials)
+ ∷ (static)
+ => "std::multimap<std::string, osg::Node *>&"
+ -> "std::map<std::string, BlenderMaterial*>&"
+ -> "void"
+ {
     for (std::map<std::string, BlenderMaterial*>::const_iterator
          i0  = materials.begin();
          i0 != materials.end();
@@ -80,6 +85,4 @@
               (*i0).second->addChild(obj);
          }
     }
- }
-
-
+ })
